@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citizen Project View | Public Works Monitoring System</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        .details-panel{display:none;margin-top:20px;border:1px solid var(--border);border-radius:8px;padding:16px;background:#fff;box-shadow:var(--shadow-sm)}
+        .details-panel.open{display:block}
+        .details-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px}
+        .details-image-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:20px}
+        .details-image-grid img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px;border:1px solid var(--border)}
+        .project-card{padding:16px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;box-shadow:var(--shadow-sm)}
+        .meta{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:20px}
+        .meta div{background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:10px}
+        .meta strong{display:block;font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+    </style>
+</head>
+<body>
+    <div class="app">
+        <aside class="side">
+            <div>
+                <h1>Public Works Portal</h1>
+            </div>
+            <div class="nav">
+                <button type="button" class="active"><i class="ph ph-map-pin"></i> Project Viewing</button>
+                <button type="button" onclick="document.getElementById('projectList').scrollIntoView({behavior:'smooth'});"><i class="ph ph-files"></i> My Projects</button>
+            </div>
+        </aside>
+        <div class="main">
+        <div class="top">
+            <div>
+                    <h2>Public Project Tracking</h2>
+                <p>Simple view for citizens to check ongoing or open projects near a pincode.</p>
+            </div>
+            <div class="topr">
+                <div class="user">
+                    <strong id="welcomeMsg"></strong>
+                    <small id="userRole"></small>
+                </div>
+                <button class="logout" onclick="logout()"><i class="ph ph-sign-out"></i> Logout</button>
+            </div>
+        </div>
+
+        <div id="message" class="msg"></div>
+
+        <div class="card">
+            <h3>Find Nearby Projects</h3>
+            <p style="color:var(--text-muted); margin-bottom:15px">Enter your 6-digit pincode to view published projects around your area. Only open or ongoing projects are shown here.</p>
+            <div class="toolbar">
+                <input type="text" id="pincodeInput" maxlength="6" placeholder="Enter 6-digit pincode" style="max-width: 200px;">
+                <input type="text" id="searchInput" placeholder="Search by project title or location">
+                <button class="btn" type="button" onclick="renderProjects()"><i class="ph ph-magnifying-glass"></i> Search</button>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap:20px;" id="projectList"></div>
+        <div id="projectDetails" class="details-panel" aria-live="polite">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:10px;">
+                <div>
+                    <h2 id="detailsTitle">Project details</h2>
+                    <p id="detailsSubtitle" style="color:var(--text-muted);margin-top:6px"></p>
+                </div>
+                <button class="btn2" type="button" onclick="clearDetails()"><i class="ph ph-x"></i> Close details</button>
+            </div>
+            <div class="details-grid">
+                <div><strong>Start Date</strong><p id="detailsStart">-</p></div>
+                <div><strong>End Date</strong><p id="detailsEnd">-</p></div>
+                <div><strong>Status</strong><p id="detailsStatus">-</p></div>
+                <div><strong>Location</strong><p id="detailsLocation">-</p></div>
+                <div style="grid-column:1 / -1"><strong>Description</strong><p id="detailsDescription">-</p></div>
+            </div>
+            <div style="margin-top:18px">
+                <h3 style="margin:0 0 12px 0;font-size:18px;color:var(--text)">Project Images</h3>
+                <div id="detailsImages" class="details-image-grid"></div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="auth-session.js"></script>
+<script src="stage-workflow.js"></script>
+<script>
+        const TENDER_META_KEY='tenderMeta';
+        const messageBox=document.getElementById('message');
+        const projectList=document.getElementById('projectList');
+        let currentUser=null;
+        let projects=[];
+        let stages=[];
+
+        function note(text,type){messageBox.textContent=text;messageBox.className=`message ${type}`;setTimeout(()=>messageBox.className='message',3500)}
+        function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+        function getTenderMeta(){try{return JSON.parse(localStorage.getItem(TENDER_META_KEY)||'{}')}catch{return {}}}
+        function mergeTenderMeta(items){const meta=getTenderMeta();return items.map(item=>meta[item.proj_id]?{...item,...meta[item.proj_id]}:item)}
+        function stagesForProject(projId){return StageWorkflow.resolveStages(stages.filter(stage=>String(stage.full_proj_id||stage.proj_id)===String(projId)))}
+        function projectStatus(project){return StageWorkflow.deriveProjectStatus(project,stagesForProject(project.proj_id))}
+
+        function loadUserInfo(){
+            currentUser=AuthSession.getCurrentUser();
+            if(!currentUser){window.location.href='login.html';return}
+            if(!AuthSession.hasRole(currentUser,'User')){window.location.href='login.html';return}
+            document.getElementById('welcomeMsg').textContent=`Welcome, ${currentUser.username}`;
+            document.getElementById('userRole').textContent=`Role: ${currentUser.role}`;
+        }
+
+        function logout(){
+            if(confirm('Are you sure you want to logout?')){
+                AuthSession.clearCurrentUser();
+                window.location.href='login.html';
+            }
+        }
+
+        async function loadProjects(){
+            const [projectRes,stageRes]=await Promise.all([
+                supabaseClient.from('Project').select('*').order('Start Date',{ascending:false}),
+                supabaseClient.from('Stage Tracking').select('*')
+            ]);
+            if(projectRes.error){
+                console.error(projectRes.error);
+                note('Unable to load projects.','err');
+                return;
+            }
+            projects=mergeTenderMeta(projectRes.data||[]);
+            stages=stageRes.error ? [] : (stageRes.data||[]);
+            renderProjects();
+        }
+
+        function filteredProjects(){
+            const pincode=document.getElementById('pincodeInput').value.trim();
+            const query=document.getElementById('searchInput').value.trim().toLowerCase();
+            return projects.filter(project=>{
+                const status=String(projectStatus(project)||'').toLowerCase();
+                const visible=status==='open'||status==='assigned'||status==='ongoing'||status==='in progress';
+                const matchesPincode=!pincode||String(project['Pincode']||'').startsWith(pincode);
+                const matchesSearch=!query||(project['Name']||'').toLowerCase().includes(query)||(project['Location']||'').toLowerCase().includes(query);
+                return visible&&matchesPincode&&matchesSearch;
+            });
+        }
+
+        function parseProjectImages(project){
+            const keys=['image_url','Image','Images','Project Images','Project_Image','project_images','images','project_image'];
+            const raw=[];
+            keys.forEach(key=>{if(project[key]) raw.push(project[key])});
+            stagesForProject(project.proj_id).forEach(stage=>{
+                if(stage?.proof_image_url) raw.push(stage.proof_image_url);
+                if(stage?.image_url) raw.push(stage.image_url);
+            });
+            const images=[];
+            raw.forEach(value=>{
+                if(Array.isArray(value)) return value.forEach(item=>item&&images.push(String(item).trim()));
+                if(typeof value==='string'){
+                    try{const parsed=JSON.parse(value);if(Array.isArray(parsed))return parsed.forEach(item=>item&&images.push(String(item).trim()))}catch{}
+                    value.split(',').map(item=>item.trim()).filter(Boolean).forEach(item=>images.push(item));
+                }
+            });
+            return images.filter(src=>/^https?:\/\//i.test(src));
+        }
+
+        function showProjectDetails(id){
+            const project=projects.find(item=>String(item.proj_id)===String(id));
+            if(!project){note('Unable to locate selected project.','err');return}
+            const status=projectStatus(project);
+            document.getElementById('detailsTitle').textContent=project['Name']||'Untitled Project';
+            document.getElementById('detailsSubtitle').textContent=`Project ID: ${project.proj_id||'-'} • ${status||'Status unknown'}`;
+            document.getElementById('detailsStart').textContent=project['Start Date']||'-';
+            document.getElementById('detailsEnd').textContent=project['End Date']||'-';
+            document.getElementById('detailsStatus').textContent=status||'-';
+            document.getElementById('detailsLocation').textContent=project['Location']||project['Pincode']||'-';
+            document.getElementById('detailsDescription').textContent=project['Description']||'No description available.';
+            const detailsImages=document.getElementById('detailsImages');
+            const images=parseProjectImages(project);
+            if(images.length){
+                detailsImages.innerHTML=images.map(src=>`<img src="${esc(src)}" alt="Project image">`).join('');
+            } else {
+                detailsImages.innerHTML='<div class="empty" style="padding:18px;border:none">No images available for this project.</div>';
+            }
+            document.getElementById('projectDetails').classList.add('open');
+            document.getElementById('projectDetails').scrollIntoView({behavior:'smooth',block:'start'});
+        }
+
+        function clearDetails(){document.getElementById('projectDetails').classList.remove('open')}
+
+        function renderProjects(){
+            const pincode=document.getElementById('pincodeInput').value.trim();
+            if(pincode && !/^\d{1,6}$/.test(pincode)){
+                note('Enter a valid pincode using digits only.','err');
+                return;
+            }
+
+            const items=filteredProjects();
+            if(!items.length){
+                projectList.innerHTML='<div class="empty">No nearby ongoing projects found.</div>';
+                return;
+            }
+
+            projectList.innerHTML=items.map(project=>`<div class="project-card" onclick="showProjectDetails('${esc(project.proj_id)}')">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+                    <h3>${esc(project['Name']||'Untitled Project')}</h3>
+                    <span class="badge ${projectStatus(project)==='Closed'?'g':'b'}">${esc(projectStatus(project)||'Open')}</span>
+                </div>
+                <p style="color:var(--text-muted);line-height:1.6">${esc(project['Description']||'No description available.')}</p>
+                <div class="meta">
+                    <div><strong>Location</strong><span>${esc(project['Location']||'-')}</span></div>
+                    <div><strong>Pincode</strong><span>${esc(project['Pincode']||'-')}</span></div>
+                    <div><strong>Deadline</strong><span>${esc(project['End Date']||'-')}</span></div>
+                    <div><strong>Project ID</strong><span>${esc(project.proj_id||'-')}</span></div>
+                </div>
+            </div>`).join('');
+        }
+
+        document.getElementById('pincodeInput').addEventListener('input',renderProjects);
+        document.getElementById('searchInput').addEventListener('input',renderProjects);
+        window.addEventListener('DOMContentLoaded',async()=>{
+            loadUserInfo();
+            await loadProjects();
+            // Auto-refresh every 15 seconds to keep dashboard live
+            setInterval(loadProjects, 15000);
+            // Supabase Realtime: instant refresh on DB changes
+            try {
+                supabaseClient.channel('userprojects-realtime')
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Project'},()=>loadProjects())
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Stage Tracking'},()=>loadProjects())
+                    .subscribe();
+            } catch(e){ console.warn('Realtime subscription not available, using polling only.',e); }
+        });
+    </script>
+</body>
+</html>

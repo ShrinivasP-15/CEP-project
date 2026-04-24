@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auditor Dashboard | Public Works Monitoring System</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        .input-group label { display: block; font-weight: 600; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+        .dashboard-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+        .loader-2 { width: 14px; }
+
+        /* Browse Projects panel */
+        #browseSection { margin-bottom: 2rem; }
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 1.25rem;
+        }
+        .filter-bar .fg {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex: 1 1 160px;
+            min-width: 140px;
+        }
+        .filter-bar .fg label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+        .filter-bar input[type="text"],
+        .filter-bar select { padding: 9px 12px; font-size: 13px; }
+        .filter-bar .fg.search-fg { flex: 2 1 220px; }
+        #browseBody tr td { font-size: 13px; }
+        .live-dot {
+            display: inline-block;
+            width: 8px; height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Auditor Dashboard: Read-only oversight portal for project monitoring and report generation -->
+    <div class="app">
+        <aside class="side">
+            <div>
+                <h1>Public Works Portal</h1>
+            </div>
+            <div class="nav">
+                <button type="button" class="active"><i class="ph ph-chart-line"></i> Audit Dashboard</button>
+                <button type="button" onclick="document.getElementById('browseSection').scrollIntoView({behavior:'smooth'});"><i class="ph ph-files"></i> Reports / Audit View</button>
+            </div>
+        </aside>
+        <div class="main">
+        <div class="top">
+            <div class="brand-section">
+                <h2>Audit Dashboard</h2>
+                <p>Public Works Monitoring System</p>
+            </div>
+            <div class="topr">
+                <div class="user">
+                    <strong id="welcomeMsg">Welcome</strong>
+                    <small id="userRole">Role</small>
+                </div>
+                <button class="logout" onclick="logout()"><i class="ph ph-sign-out"></i> Logout</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats" style="margin-bottom: 24px;">
+            <div class="stat">
+                <i class="ph-duotone ph-folder-kanban" style="font-size: 32px; color: var(--primary); margin-bottom: 8px;"></i>
+                <small>TOTAL PROJECTS</small>
+                <strong id="projectCount">0</strong>
+            </div>
+            <div class="stat">
+                <i class="ph-duotone ph-layers" style="font-size: 32px; color: var(--info); margin-bottom: 8px;"></i>
+                <small>TOTAL STAGES</small>
+                <strong id="stageCount">0</strong>
+            </div>
+            <div class="stat">
+                <i class="ph-duotone ph-shield-check" style="font-size: 32px; color: var(--success); margin-bottom: 8px;"></i>
+                <small>VERIFICATIONS</small>
+                <strong id="verificationCount">0</strong>
+            </div>
+            <div class="stat">
+                <i class="ph-duotone ph-users" style="font-size: 32px; color: var(--warning); margin-bottom: 8px;"></i>
+                <small>ACTIVE USERS</small>
+                <strong id="userCount">0</strong>
+            </div>
+        </div>
+
+        <!-- ===== Browse Projects ===== -->
+        <div id="browseSection" class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h2><i class="ph ph-magnifying-glass" style="color:var(--primary);"></i> Browse Projects</h2>
+                    <p style="color:var(--text-muted); font-size:0.85rem; font-weight:600;">
+                        <span class="live-dot"></span>Live view - filters update the table instantly from the database.
+                    </p>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn2" onclick="resetBrowseFilters()"><i class="ph ph-arrows-clockwise"></i> Reset</button>
+                    <div class="badge g"><i class="ph ph-eye" style="margin-right:4px;"></i> READ-ONLY ACCESS</div>
+                </div>
+            </div>
+
+            <div id="browseMessage" class="msg" style="display:none;"></div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <div class="fg search-fg">
+                    <label>Search</label>
+                    <input type="text" id="browseSearch" placeholder="Name, ID, contractor..." oninput="applyBrowseFilters()">
+                </div>
+                <div class="fg">
+                    <label>Status</label>
+                    <select id="browseStatus" onchange="applyBrowseFilters()">
+                        <option value="all">All Statuses</option>
+                        <option>Open</option>
+                        <option>Closed</option>
+                        <option>In Progress</option>
+                        <option>On Hold</option>
+                        <option>Completed</option>
+                        <option>Cancelled</option>
+                    </select>
+                </div>
+                <div class="fg">
+                    <label>Verification</label>
+                    <select id="browseVerification" onchange="applyBrowseFilters()">
+                        <option value="all">All Verifications</option>
+                        <option>Approved</option>
+                        <option>Pending</option>
+                        <option>Rejected</option>
+                        <option>In Review</option>
+                        <option>Hold</option>
+                    </select>
+                </div>
+                <div class="fg">
+                    <label>Payment</label>
+                    <select id="browsePayment" onchange="applyBrowseFilters()">
+                        <option value="all">All Payments</option>
+                        <option>Released</option>
+                        <option>Approved</option>
+                        <option>Pending</option>
+                        <option>Rejected</option>
+                        <option>Partial</option>
+                    </select>
+                </div>
+                <div class="fg">
+                    <label>Contractor</label>
+                    <input type="text" id="browseContractor" placeholder="Contractor name..." oninput="applyBrowseFilters()">
+                </div>
+                <div class="fg">
+                    <label>Deadline From</label>
+                    <input type="date" id="browseFrom" onchange="applyBrowseFilters()">
+                </div>
+                <div class="fg">
+                    <label>Deadline To</label>
+                    <input type="date" id="browseTo" onchange="applyBrowseFilters()">
+                </div>
+            </div>
+
+            <div style="margin-bottom:8px; font-size:13px; color:var(--text-muted);">
+                Showing <strong id="browseCount">0</strong> project(s)
+            </div>
+
+            <div class="wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tender ID</th>
+                            <th>Tender Title</th>
+                            <th>Deadline</th>
+                            <th>Status</th>
+                            <th>Verification</th>
+                            <th>Payment</th>
+                            <th>Contractor</th>
+                            <th>Location</th>
+                        </tr>
+                    </thead>
+                    <tbody id="browseBody">
+                        <tr><td colspan="8"><div class="empty">Loading projects...</div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Report Generator -->
+        <div class="card" style="margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 2rem; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h2>
+                        <i class="ph ph-file-text" style="color: var(--primary);"></i>
+                        Report Generator
+                    </h2>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">
+                        Generate specialized audit reports with real-time system data.
+                    </p>
+                </div>
+                <div class="badge g">
+                    <i class="ph ph-eye" style="margin-right: 4px;"></i> READ-ONLY ACCESS
+                </div>
+            </div>
+
+            <div id="queryMessage" class="msg" style="display: none;"></div>
+
+            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 2rem;" class="dashboard-grid">
+                <div class="input-group">
+                    <label class="input-label">Select Report Template</label>
+                    <select id="queryType" onchange="updateQueryParameters()" style="padding-left: 1rem;">
+                        <option value="">-- Choose a report to begin --</option>
+                        <option value="project_by_status">Projects by Status</option>
+                        <option value="stage_progress">Stage Progress Report</option>
+                        <option value="verification_status">Verification Status Report</option>
+                        <option value="user_activity">User Activity Report</option>
+                        <option value="project_timeline">Project Timeline Report</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">Timeframe</label>
+                    <select id="dateRange">
+                        <option value="all">Unlimited (All Time)</option>
+                        <option value="7days">Last 7 Cycles</option>
+                        <option value="30days">Last 30 Cycles</option>
+                        <option value="90days">Standard Quarter (90d)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Dynamic Parameters Section -->
+            <div id="parametersSection" style="display: none; border-top: 1px solid var(--border); padding-top: 2rem; margin-top: 1rem;">
+                <div id="parametersGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                    <!-- JS content -->
+                </div>
+
+                <div style="display: flex; gap: 1rem;">
+                    <button class="btn btn-primary" id="executeQueryBtn" onclick="executeParameterizedQuery()">
+                        <i class="ph ph-play"></i> Generate Terminal Report
+                    </button>
+                    <button class="btn2" onclick="clearQuery()">
+                        <i class="ph ph-arrows-clockwise"></i> Clear Sequence
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="queryResults" class="card" style="display: none; padding: 1.5rem;">
+            <h2 style="margin-bottom: 1.5rem;">
+                <i class="ph ph-database" style="color: var(--success);"></i>
+                Sequence Output
+            </h2>
+            <div class="wrap">
+                <div id="resultsContent"></div>
+            </div>
+        </div>
+
+    </div><!-- /.main -->
+    </div>
+
+    <!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="auth-session.js"></script>
+<script src="stage-workflow.js"></script>
+<script>
+        const AUDITOR_ROLE = 'auditor';
+
+        // ── Browse state ──────────────────────────────────────────────────────
+        let allProjects     = [];
+        let allVerifications = [];
+        let allStages = [];
+
+        // ── Report templates ─────────────────────────────────────────────────
+        const queryTemplates = {
+            project_by_status: {
+                name: 'Projects by Status',
+                parameters: [
+                    { name: 'status', label: 'Project Status', type: 'select', options: ['Open','Closed','In Progress','On Hold','Completed','Cancelled'] }
+                ],
+                queryFn: async (params) => {
+                    return await supabaseClient.from('Project').select('*').eq('Status', params.status);
+                }
+            },
+            stage_progress: {
+                name: 'Stage Progress Report',
+                parameters: [
+                    { name: 'status', label: 'Stage Status', type: 'select', options: ['Not Started', 'In Progress', 'Under Review', 'Completed', 'Blocked', 'Open', 'Pending Nod'] }
+                ],
+                queryFn: async (params) => {
+                    return await supabaseClient.from('Stage Tracking').select('*').eq('status', params.status);
+                }
+            },
+            verification_status: {
+                name: 'Verification Status Report',
+                parameters: [
+                    { name: 'status', label: 'Verification Status', type: 'select', options: ['Approved', 'Pending', 'Rejected'] }
+                ],
+                queryFn: async (params) => {
+                    // 'Verification Satus' is the actual DB column name (typo in schema)
+                    return await supabaseClient.from('Verification').select('*').eq('Verification Satus', params.status);
+                }
+            },
+            user_activity: {
+                name: 'User Activity Report',
+                parameters: [
+                    { name: 'role', label: 'User Role', type: 'select', options: ['Admin', 'Auditor', 'Contractor', 'Verification Officer', 'User'] }
+                ],
+                queryFn: async (params) => {
+                    return await supabaseClient.from('users').select('*').eq('role', params.role);
+                }
+            },
+            project_timeline: {
+                name: 'Project Timeline Report',
+                parameters: [
+                    { name: 'searchTerm', label: 'Key Identifier (Optional)', type: 'text', placeholder: 'Ref name or ID...' }
+                ],
+                queryFn: async (params) => {
+                    let query = supabaseClient.from('Project').select('*').order('Start Date', { ascending: false });
+                    if (params.searchTerm) query = query.ilike('Name', `%${params.searchTerm}%`);
+                    return await query;
+                }
+            }
+        };
+
+        // ── Auth ──────────────────────────────────────────────────────────────
+        function loadUserInfo() {
+            const currentUser = AuthSession.getCurrentUser();
+            if (!currentUser) { window.location.href = 'login.html'; return; }
+            if (AuthSession.normalizeRole(currentUser.role) !== AUDITOR_ROLE) {
+                alert('Access Restricted: Auditor credentials required.');
+                window.location.href = 'login.html';
+                return;
+            }
+            document.getElementById('welcomeMsg').textContent = `Welcome, ${currentUser.username || 'Auditor'}`;
+            document.getElementById('userRole').textContent = currentUser.role;
+        }
+
+        function logout() {
+            if (confirm('Verify: Terminate current session?')) {
+            AuthSession.clearCurrentUser();
+            window.location.href = 'login.html';
+            }
+        }
+
+        // ── Stats ─────────────────────────────────────────────────────────────
+        async function updateStats() {
+            try {
+                const [p, s, v, u] = await Promise.all([
+                    supabaseClient.from('Project').select('proj_id', { count: 'exact', head: true }),
+                    supabaseClient.from('Stage Tracking').select('stage_id', { count: 'exact', head: true }),
+                    supabaseClient.from('Verification').select('Verific_no', { count: 'exact', head: true }),
+                    supabaseClient.from('users').select('id', { count: 'exact', head: true })
+                ]);
+                document.getElementById('projectCount').textContent   = p.count ?? 0;
+                document.getElementById('stageCount').textContent     = s.count ?? 0;
+                document.getElementById('verificationCount').textContent = v.count ?? 0;
+                document.getElementById('userCount').textContent      = u.count ?? 0;
+            } catch (err) { console.error('Stats Sync Error:', err); }
+        }
+
+        // ── Browse Projects ──────────────────────────────────────────────────
+        function esc(v) {
+            return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
+        function vfBadge(s) {
+            if (s === 'Approved')  return `<span class="badge g">${esc(s)}</span>`;
+            if (s === 'Rejected')  return `<span class="badge r">${esc(s)}</span>`;
+            if (s === 'In Review' || s === 'Hold') return `<span class="badge y">${esc(s)}</span>`;
+            return `<span class="badge p">${esc(s || 'Pending')}</span>`;
+        }
+        function payBadge(s) {
+            if (s === 'Released') return `<span class="badge g">${esc(s)}</span>`;
+            if (s === 'Approved') return `<span class="badge b">${esc(s)}</span>`;
+            if (s === 'Rejected') return `<span class="badge r">${esc(s)}</span>`;
+            if (s === 'Partial')  return `<span class="badge y">${esc(s)}</span>`;
+            return `<span class="badge p">${esc(s || 'Pending')}</span>`;
+        }
+        function stBadge(status) {
+            if (status === 'Closed' || status === 'Completed') return `<span class="badge g">${esc(status)}</span>`;
+            const today = new Date(); today.setHours(0,0,0,0);
+            return `<span class="badge b">${esc(status || 'Open')}</span>`;
+        }
+        function stagesForProject(projId) {
+            return StageWorkflow.resolveStages(allStages.filter(stage => String(stage.full_proj_id || stage.proj_id) === String(projId)));
+        }
+        function projectStatus(project) {
+            return StageWorkflow.deriveProjectStatus(project, stagesForProject(project.proj_id));
+        }
+
+        async function loadBrowseData() {
+            const [pr, vr, sr] = await Promise.all([
+                supabaseClient.from('Project').select('*').order('Start Date', { ascending: false }),
+                supabaseClient.from('Verification').select('*'),
+                supabaseClient.from('Stage Tracking').select('*')
+            ]);
+            if (pr.error) { console.error(pr.error); return; }
+            allProjects      = pr.data || [];
+            allVerifications = vr.error ? [] : (vr.data || []);
+            allStages        = sr.error ? [] : (sr.data || []);
+            applyBrowseFilters();
+        }
+
+        function applyBrowseFilters() {
+            const search    = document.getElementById('browseSearch').value.trim().toLowerCase();
+            const status    = document.getElementById('browseStatus').value;
+            const verif     = document.getElementById('browseVerification').value;
+            const payment   = document.getElementById('browsePayment').value;
+            const contractor= document.getElementById('browseContractor').value.trim().toLowerCase();
+            const fromDate  = document.getElementById('browseFrom').value;
+            const toDate    = document.getElementById('browseTo').value;
+
+            const filtered = allProjects.filter(p => {
+                const vRec  = allVerifications.find(v => v.proj_id === p.proj_id) || {};
+                const vStatus = vRec['Verification Satus'] || 'Pending';
+                const summary = StageWorkflow.counts(stagesForProject(p.proj_id));
+                const pStatus = summary.total > 0 && summary.paid === summary.total ? 'Released' : (vRec['Payment_Approval'] || 'Pending');
+                const contractor_name = (p['Assigned officer'] || '').toLowerCase();
+                const deadline = p['End Date'] || '';
+                const effectiveStatus = projectStatus(p);
+
+                const matchSearch = !search ||
+                    (p['Name'] || '').toLowerCase().includes(search) ||
+                    (p.proj_id || '').toLowerCase().includes(search) ||
+                    contractor_name.includes(search) ||
+                    (p['Location'] || '').toLowerCase().includes(search);
+
+                const matchStatus    = status  === 'all' || effectiveStatus === status;
+                const matchVerif     = verif   === 'all' || vStatus === verif;
+                const matchPayment   = payment === 'all' || pStatus === payment;
+                const matchContractor= !contractor || contractor_name.includes(contractor);
+                const matchFrom      = !fromDate || deadline >= fromDate;
+                const matchTo        = !toDate   || deadline <= toDate;
+
+                return matchSearch && matchStatus && matchVerif && matchPayment && matchContractor && matchFrom && matchTo;
+            });
+
+            renderBrowseTable(filtered);
+        }
+
+        function renderBrowseTable(list) {
+            const body = document.getElementById('browseBody');
+            document.getElementById('browseCount').textContent = list.length;
+
+            if (!list.length) {
+                body.innerHTML = '<tr><td colspan="8"><div class="empty">No projects match the current filters.</div></td></tr>';
+                return;
+            }
+
+            body.innerHTML = list.map(p => {
+                const vRec    = allVerifications.find(v => v.proj_id === p.proj_id) || {};
+                const vStatus = vRec['Verification Satus'] || 'Pending';
+                const summary = StageWorkflow.counts(stagesForProject(p.proj_id));
+                const pStatus = summary.total > 0 && summary.paid === summary.total ? 'Released' : (vRec['Payment_Approval'] || 'Pending');
+                const effectiveStatus = projectStatus(p);
+                const id      = (p.proj_id || '').length > 10 ? p.proj_id.slice(0,10) + '…' : (p.proj_id || '-');
+                return `<tr>
+                    <td title="${esc(p.proj_id)}">${esc(id)}</td>
+                    <td>${esc(p['Name'] || 'Untitled Tender')}</td>
+                    <td>${esc(p['End Date'] || '-')}</td>
+                    <td>${stBadge(effectiveStatus)}</td>
+                    <td>${vfBadge(vStatus)}</td>
+                    <td>${payBadge(pStatus)}</td>
+                    <td>${esc(p['Assigned officer'] || 'Not Assigned')}</td>
+                    <td>${esc(p['Location'] || '-')}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function resetBrowseFilters() {
+            ['browseSearch','browseContractor','browseFrom','browseTo'].forEach(id => document.getElementById(id).value = '');
+            ['browseStatus','browseVerification','browsePayment'].forEach(id => document.getElementById(id).value = 'all');
+            applyBrowseFilters();
+        }
+
+        // ── Report Generator ─────────────────────────────────────────────────
+        function updateQueryParameters() {
+            const queryType = document.getElementById('queryType').value;
+            const container = document.getElementById('parametersSection');
+            const grid      = document.getElementById('parametersGrid');
+
+            if (!queryType) { container.style.display = 'none'; return; }
+
+            const template = queryTemplates[queryType];
+            let html = '';
+            template.parameters.forEach(param => {
+                html += `<div class="input-group"><label class="input-label">${param.label}</label>`;
+                if (param.type === 'select') {
+                    html += `<select id="param_${param.name}"><option value="">-- Select --</option>`;
+                    param.options.forEach(opt => html += `<option value="${opt}">${opt}</option>`);
+                    html += `</select>`;
+                } else {
+                    html += `<input type="text" id="param_${param.name}" placeholder="${param.placeholder || ''}">`;
+                }
+                html += `</div>`;
+            });
+
+            grid.innerHTML = html;
+            container.style.display = 'block';
+        }
+
+        async function executeParameterizedQuery() {
+            const queryType = document.getElementById('queryType').value;
+            if (!queryType) { showMessage('Please select a report template first.', 'error'); return; }
+            const template = queryTemplates[queryType];
+            const params = {};
+
+            for (const p of template.parameters) {
+                const val = document.getElementById(`param_${p.name}`).value;
+                if (!val && p.type === 'select') {
+                    showMessage(`Identification Failure: ${p.label} missing.`, 'error');
+                    return;
+                }
+                params[p.name] = val;
+            }
+
+            const btn = document.getElementById('executeQueryBtn');
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph ph-spinner loader-2"></i> Generating Report...';
+
+            try {
+                const { data, error } = await template.queryFn(params);
+                if (error) throw error;
+                displayResults(data);
+                showMessage(`Report Synchronized: ${data.length} record(s) found.`, 'success');
+            } catch (err) {
+                console.error(err);
+                showMessage(`Sync Failure: ${err.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        }
+
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('queryResults');
+            const content    = document.getElementById('resultsContent');
+
+            if (!data || data.length === 0) {
+                content.innerHTML = '<div style="padding: 3rem; text-align: center; color: var(--text-muted);">No sequence matches found in database.</div>';
+                resultsDiv.style.display = 'block';
+                return;
+            }
+
+            const cols = Object.keys(data[0]);
+            let html = '<table><thead><tr>';
+            cols.forEach(c => html += `<th>${c.toUpperCase()}</th>`);
+            html += '</tr></thead><tbody>';
+
+            data.forEach(row => {
+                html += '<tr>';
+                cols.forEach(c => {
+                    const val = row[c];
+                    html += `<td>${val === null ? '<em>NULL</em>' : String(val).substring(0, 60)}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            content.innerHTML = html;
+            resultsDiv.style.display = 'block';
+        }
+
+        function showMessage(msg, type) {
+            const div = document.getElementById('queryMessage');
+            div.textContent = msg;
+            div.className = `msg ${type === 'error' ? 'err' : (type === 'success' ? 'ok' : 'warn')}`;
+            div.style.display = 'block';
+            setTimeout(() => div.style.display = 'none', 6000);
+        }
+
+        function clearQuery() {
+            document.getElementById('queryType').value = '';
+            document.getElementById('parametersSection').style.display = 'none';
+            document.getElementById('queryResults').style.display = 'none';
+            document.getElementById('queryMessage').style.display = 'none';
+        }
+
+        // ── Init ─────────────────────────────────────────────────────────────
+        window.addEventListener('DOMContentLoaded', async () => {
+            loadUserInfo();
+            await Promise.all([updateStats(), loadBrowseData()]);
+
+            // Poll every 15s
+            setInterval(() => { updateStats(); loadBrowseData(); }, 15000);
+
+            // Supabase Realtime
+            try {
+                supabaseClient.channel('auditor-realtime')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'Project' },      () => { updateStats(); loadBrowseData(); })
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'Verification' }, () => { updateStats(); loadBrowseData(); })
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'Stage Tracking'},() => { updateStats(); loadBrowseData(); })
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'users' },        () => updateStats())
+                    .subscribe();
+            } catch (e) { console.warn('Realtime not available, using polling only.', e); }
+        });
+    </script>
+</body>
+
+</html>

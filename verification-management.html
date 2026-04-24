@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Page Configuration and Stylesheets -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Management | Public Works Monitoring System</title>
+    <!-- Main Dashboard Stylesheet -->
+    <link rel="stylesheet" href="dashboard.css">
+    <!-- Icon Library for UI Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar Navigation -->
+        <aside class="side">
+            <div class="side-header">
+                <span class="portal-badge">Official Portal</span>
+                <h1>Public Works Portal</h1>
+            </div>
+            <!-- Main Navigation Links -->
+            <div class="nav">
+                <button type="button" class="active" id="navPending" onclick="switchVerificationView('active')"><i class="ph ph-check-square"></i> Pending Verifications</button>
+                <button type="button" id="navHistory" onclick="switchVerificationView('history')"><i class="ph ph-archive-box"></i> History</button>
+            </div>
+        </aside>
+        <div class="main">
+        <!-- Header / Top Bar with User Info -->
+        <div class="top">
+            <div>
+                <h2>Verification Management</h2>
+                <p>Manage and process stage verification for project payments.</p>
+            </div>
+            <div class="topr">
+                <div class="user">
+                    <strong id="welcomeMsg">Welcome</strong>
+                    <small id="userRole">Role</small>
+                </div>
+                <button class="logout" onclick="logout()"><i class="ph ph-sign-out"></i> Logout</button>
+            </div>
+        </div>
+            <div class="content">
+            <!-- Notification Message Area -->
+            <div id="message" class="msg"></div>
+
+            <div class="management-layout">
+                <!-- Verification Form Card -->
+                <div class="card">
+                    <h3 style="margin-bottom:15px">Add/Update Verification</h3>
+                    <form id="verificationForm">
+                        <div class="field">
+                            <label for="verificationNumber">Verification Number (Auto-generated)</label>
+                            <input id="verificationNumber" type="text" placeholder="Auto-generated" readonly>
+                        </div>
+                        <div class="field">
+                            <label for="projectId">Project ID *</label>
+                            <input id="projectId" type="text" placeholder="Enter Project ID" readonly>
+                        </div>
+                        <div class="field">
+                            <label for="stageId">Stage ID *</label>
+                            <input id="stageId" type="text" placeholder="Enter Stage ID" readonly>
+                        </div>
+                        <div class="field">
+                            <label for="verificationStatus">Verification Status *</label>
+                            <select id="verificationStatus" required>
+                                <option value="">Select Status</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Rejected">Rejected</option>
+                                <option value="Pending">Pending</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="remarks">Remarks</label>
+                            <textarea id="remarks" placeholder="Enter any remarks or comments"></textarea>
+                        </div>
+                        <!-- Container for showing the image uploaded by the contractor -->
+                        <div class="field" id="stageImagePreviewContainer" style="display:none;">
+                            <label>Stage Image Preview</label>
+                            <div id="stageImagePreview" style="border:1px solid #d7dceb;border-radius:8px;padding:10px;text-align:center;background:#f9fafb;"></div>
+                        </div>
+                        <div class="actions" style="display:flex; gap:10px; margin-top:20px;">
+                            <button class="btn" type="submit" style="flex:1">Save Verification</button>
+                            <button class="btn2" type="button" onclick="clearForm()" style="flex:1">Clear</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Verifications List Card -->
+                <div class="card">
+                    <h3 style="margin-bottom:15px">Verifications List</h3>
+                    <!-- View Toggle: Active (Pending) vs History (Processed) -->
+                    <div style="display:flex;gap:8px;margin-bottom:12px;">
+                        <button type="button" class="btn2 active" id="activeViewBtn" onclick="switchVerificationView('active')"><i class="ph ph-list-checks"></i> Active</button>
+                        <button type="button" class="btn2" id="historyViewBtn" onclick="switchVerificationView('history')"><i class="ph ph-archive-box"></i> History</button>
+                    </div>
+                    <!-- Detailed Project Summary and Stage Tracker (visible when project is opened) -->
+                    <div id="verificationProjectSummary" style="margin-bottom:16px;"></div>
+                    
+                    <!-- Table for Stages Pending Verification -->
+                    <div class="wrap" id="activeVerificationWrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Verification #</th>
+                                    <th>Tender Title</th>
+                                    <th>Project ID</th>
+                                    <th>Stage ID</th>
+                                    <th>Latest Stage</th>
+                                    <th>Image</th>
+                                    <th>Verification Status</th>
+                                    <th>Remarks</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="verificationBody"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Table for Processed Verification History -->
+                    <div class="wrap" id="historyVerificationWrap" style="display:none;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Verification #</th>
+                                    <th>Tender Title</th>
+                                    <th>Project ID</th>
+                                    <th>Stage ID</th>
+                                    <th>Stage Status</th>
+                                    <th>Verification Status</th>
+                                    <th>Payment</th>
+                                    <th>Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody id="verificationHistoryBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- External Libraries and Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="auth-session.js"></script>
+    <script src="performance-system.js"></script>
+    <script src="stage-workflow.js"></script>
+
+    <script>
+        // Storage Keys for LocalData fallbacks and metadata
+        const TENDER_META_KEY='tenderMeta';
+        const STAGE_UPDATE_KEY='contractorStageUpdates';
+        const STAGE_META_KEY='contractorStageMeta';
+        
+        // UI Elements
+        const messageBox=document.getElementById('message');
+        const form=document.getElementById('verificationForm');
+        
+        // Global State Variables
+        let tenders=[],applications=[],stages=[],verifications=[],dbStageIds=new Set(),editingId=null,selectedVerificationProjectId='',currentVerificationView='active';
+
+        /**
+         * Utility: Display notification notes to the user
+         */
+        function note(text,type){messageBox.textContent=text;messageBox.className=`msg ${type}`;setTimeout(()=>messageBox.className='msg',4000)}
+        
+        /**
+         * Utility: Escape HTML to prevent XSS
+         */
+        function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+        
+        // Metadata Retrieval Helpers
+        function getTenderMeta(){try{return JSON.parse(localStorage.getItem(TENDER_META_KEY)||'{}')}catch{return {}}}
+        function getStageMeta(){try{return JSON.parse(localStorage.getItem(STAGE_META_KEY)||'{}')}catch{return {}}}
+        function getLocalStages(){try{return JSON.parse(localStorage.getItem(STAGE_UPDATE_KEY)||'[]')}catch{return []}}
+        
+        /**
+         * Merges database tender data with local metadata (UI colors, status overrides)
+         */
+        function mergeTenderMeta(items){const meta=getTenderMeta();return items.map(item=>meta[item.proj_id]?{...item,...meta[item.proj_id]}:item)}
+        
+        /**
+         * Returns CSS class based on verification status
+         */
+        function statusClass(value){if(value==='Approved')return'approved';if(value==='Rejected')return'rejected';return'pending'}
+        
+        // Lookup Helpers
+        function verificationForTender(tenderId){return verifications.find(item=>String(item.proj_id)===String(tenderId))||null}
+        function verificationForStage(stageId){return verifications.find(item=>String(item.stage_id)===String(stageId))||null}
+        
+        /**
+         * Sorts project stages using the standardized workflow logic
+         */
+        function stageOrderForTender(tenderId){return StageWorkflow.sortStages(stages.filter(stage=>String(stage.full_proj_id||stage.proj_id)===String(tenderId)))}
+        
+        /**
+         * Normalizes stage status to consistent keywords (Pending, Completed, Verified, etc.)
+         */
+        function normalizedStageStatus(stage){return StageWorkflow.normalizeStatus(stage)}
+        
+        /**
+         * Identifies the current stage that needs verification
+         */
+        function currentVerifiableStage(tenderId){return StageWorkflow.currentStage(stageOrderForTender(tenderId))}
+        
+        /**
+         * Returns the latest active stage for a tender
+         */
+        function latestStageForTender(tenderId,options={}){
+            const { requireDb=false }=options;
+            const active=currentVerifiableStage(tenderId);
+            if(requireDb && active && !dbStageIds.has(String(active.stage_id))) return null;
+            return active||null
+        }
+        
+        /**
+         * Retrieves a specific stage for history display, defaulting to the latest stage
+         */
+        function stageForHistory(tenderId,stageId){
+            const ordered=StageWorkflow.resolveStages(stageOrderForTender(tenderId));
+            if(stageId){
+                const direct=ordered.find(stage=>String(stage.stage_id)===String(stageId));
+                if(direct) return direct;
+            }
+            return ordered[ordered.length-1]||null;
+        }
+
+        /**
+         * Auth: Validates session and ensures the user has 'Verification Officer' role
+         */
+        function loadUserInfo(){
+            const currentUser=AuthSession.getCurrentUser();
+            if(!currentUser){window.location.href='login.html';return}
+            if(!AuthSession.hasRole(currentUser,'Verification Officer')){window.location.href='login.html';return}
+            document.getElementById('welcomeMsg').textContent=`Welcome, ${currentUser.username}!`;
+            document.getElementById('userRole').textContent=`Role: ${currentUser.role}`;
+        }
+
+        /**
+         * Logs out the user and clears the session
+         */
+        function logout(){
+            if(confirm('Are you sure you want to logout?')){
+                AuthSession.clearCurrentUser();
+                window.location.href='login.html';
+            }
+        }
+
+        /**
+         * Formats raw DB stage data into a unified object with metadata
+         */
+        function normalizeStages(dbStages){
+            const stageMeta=getStageMeta();
+            return (dbStages||[]).map(stage=>{
+                const meta=stageMeta[stage.stage_id]||{};
+                return {
+                    stage_id: stage.stage_id,
+                    proj_id: stage.proj_id,
+                    full_proj_id: meta.full_proj_id || stage.proj_id,
+                    contractor_id: stage.contractor_id ?? meta.contractor_id ?? '',
+                    stage_name: meta.stage_name || stage.stage_name || 'Stage Update',
+                    status: stage.status || '',
+                    remarks: meta.remarks || stage.remarks || '',
+                    date: meta.date || stage.date || stage['start date'] || '',
+                    end_date: stage['end date']||'',
+                    image_url: meta.image_url || meta.proof_image_url || stage.image_url || stage.proof_image_url || '',
+                    proof_image_url: meta.proof_image_url || meta.image_url || stage.proof_image_url || stage.image_url || '',
+                    stage_amount: meta.stage_amount ?? stage.stage_amount ?? '',
+                    payment_status: meta.payment_status || stage.payment_status || 'Pending',
+                    payment_date: meta.payment_date || stage.payment_date || '',
+                    completion_date: meta.completion_date || stage.completion_date || ''
+                };
+            });
+        }
+
+        /**
+         * Main data loader: Fetches Tenders, Applications, Stages, and Verifications from Supabase
+         */
+        async function loadData(){
+            const [tenderRes,applicationRes,stageRes,verificationRes]=await Promise.all([
+                supabaseClient.from('Project').select('*').order('Start Date',{ascending:false}),
+                supabaseClient.from('Applications').select('*').order('application_id',{ascending:false}),
+                supabaseClient.from('Stage Tracking').select('*'),
+                supabaseClient.from('Verification').select('*').order('Verific_no',{ascending:false})
+            ]);
+
+            if(tenderRes.error){console.error(tenderRes.error);note('Unable to load tenders.','err');return}
+
+            tenders=mergeTenderMeta(tenderRes.data||[]);
+            applications=applicationRes.error ? [] : (applicationRes.data||[]);
+            verifications=verificationRes.error ? [] : (verificationRes.data||[]);
+
+            const dbStages=stageRes.error ? [] : normalizeStages(stageRes.data||[]);
+            dbStageIds=new Set(dbStages.map(stage=>String(stage.stage_id)));
+            
+            // Merge DB stages with any local updates
+            const localStages=getLocalStages().map(stage=>({...stage,full_proj_id:stage.full_proj_id||stage.proj_id}));
+            const knownIds=new Set(dbStages.map(stage=>stage.stage_id));
+            stages=[...dbStages,...localStages.filter(stage=>!knownIds.has(stage.stage_id))];
+
+            renderTable();
+            renderHistoryTable();
+        }
+
+        /**
+         * Renders the 'Active' verification table (Pending tasks)
+         */
+        function renderTable(){
+            const body=document.getElementById('verificationBody');
+            const activeItems=tenders.filter(tender=>{
+                const stage=latestStageForTender(tender.proj_id,{requireDb:true})||latestStageForTender(tender.proj_id);
+                return normalizedStageStatus(stage)==='Completed';
+            });
+
+            if(!activeItems.length){
+                body.innerHTML='<tr><td colspan="9"><div class="empty">No stages are waiting for verification right now.</div></td></tr>';
+                renderVerificationProjectSummary();
+                return;
+            }
+
+            body.innerHTML=activeItems.map(tender=>{
+                const item=verificationForTender(tender.proj_id)||{};
+                const stage=latestStageForTender(tender.proj_id,{requireDb:true})||latestStageForTender(tender.proj_id);
+                const stageStatus=normalizedStageStatus(stage);
+                const status=stageStatus==='Verified'?'Approved':stageStatus==='Rejected'?'Rejected':item['Verification Satus']||'Pending';
+                const canVerify=!!stage && stageStatus==='Completed';
+                const ordered=stageOrderForTender(tender.proj_id);
+                const counts=StageWorkflow.counts(ordered);
+                return `<tr>
+                    <td>${esc(item['Verific_no']||'-')}</td>
+                    <td>${esc(tender['Name']||'Untitled Tender')}</td>
+                    <td>${esc(tender.proj_id||'-')}</td>
+                    <td>${esc(item.stage_id||stage?.stage_id||'-')}</td>
+                    <td>${esc(stage?`${stage.stage_name} - ${stageStatus}`:'No stages configured')}</td>
+                    <td>${stage?.proof_image_url||stage?.image_url?`<button class="btn2" style="padding:6px 12px;font-size:13px;" type="button" onclick="viewStageImage('${esc(stage.stage_id||'')}')"><i class="ph ph-image"></i> View</button>`:'-'}</td>
+                    <td><span class="status ${statusClass(status)}">${esc(status)}</span></td>
+                    <td>${esc(item['Remarks']||stage?.remarks||'-')}</td>
+                    <td>
+                        <div style="margin-bottom:8px;color:var(--text-muted);font-size:12px;">${ordered.length ? `${counts.verified}/${ordered.length} verified | ${counts.paid}/${ordered.length} paid` : 'No stages yet'}</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button class="btn2" style="padding:6px 12px;font-size:13px;" type="button" onclick="openVerificationProject('${esc(tender.proj_id)}')"><i class="ph ph-eye"></i> Open Project</button>
+                            <button class="btn2" style="padding:6px 12px;font-size:13px;" type="button" onclick="editVerificationByTender('${esc(tender.proj_id)}')"><i class="ph ph-pencil-simple"></i> Edit</button>
+                            <button class="btn2" style="padding:6px 12px;font-size:13px;color:var(--success);" type="button" onclick="quickVerify('${esc(tender.proj_id)}','Approved')" ${canVerify?'':'disabled'}><i class="ph ph-check-circle"></i> Approve</button>
+                            <button class="btn2" style="padding:6px 12px;font-size:13px;color:var(--danger);" type="button" onclick="quickVerify('${esc(tender.proj_id)}','Rejected')" ${canVerify?'':'disabled'}><i class="ph ph-x-circle"></i> Reject</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+            renderVerificationProjectSummary();
+        }
+
+        /**
+         * Renders the 'History' verification table (Already processed tasks)
+         */
+        function renderHistoryTable(){
+            const body=document.getElementById('verificationHistoryBody');
+            const historyItems=(verifications||[]);
+            if(!historyItems.length){
+                body.innerHTML='<tr><td colspan="8"><div class="empty">No verification history found.</div></td></tr>';
+                return;
+            }
+            body.innerHTML=historyItems.map(item=>{
+                const tender=tenders.find(project=>String(project.proj_id)===String(item.proj_id));
+                const stage=stageForHistory(item.proj_id,item.stage_id);
+                const stageStatus=stage?.displayStatus||stage?.status||'-';
+                const payment=stage?.payment_status||'Pending';
+                return `<tr>
+                    <td>${esc(item['Verific_no']||'-')}</td>
+                    <td>${esc(tender?.['Name']||'Untitled Tender')}</td>
+                    <td>${esc(item.proj_id||'-')}</td>
+                    <td>${esc(item.stage_id||'-')}</td>
+                    <td>${esc(stageStatus)}</td>
+                    <td><span class="status ${statusClass(item['Verification Satus'])}">${esc(item['Verification Satus']||'-')}</span></td>
+                    <td>${esc(payment)}</td>
+                    <td>${esc(item['Remarks']||'-')}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        /**
+         * Toggles between Active and History dashboard views
+         */
+        function switchVerificationView(view){
+            currentVerificationView=view;
+            document.getElementById('activeVerificationWrap').style.display=view==='active'?'block':'none';
+            document.getElementById('historyVerificationWrap').style.display=view==='history'?'block':'none';
+            
+            // Update Inner Card Buttons
+            document.getElementById('activeViewBtn').classList.toggle('active',view==='active');
+            document.getElementById('historyViewBtn').classList.toggle('active',view==='history');
+            
+            // Update Sidebar Navigation Buttons
+            const navPending = document.getElementById('navPending');
+            const navHistory = document.getElementById('navHistory');
+            if(navPending) navPending.classList.toggle('active', view === 'active');
+            if(navHistory) navHistory.classList.toggle('active', view === 'history');
+
+            const readOnly=view==='history';
+            form.querySelectorAll('input, select, textarea, button[type="submit"]').forEach(element=>{
+                if(element.id==='verificationNumber') return;
+                element.disabled=readOnly;
+            });
+            if(view==='history'){
+                selectedVerificationProjectId='';
+                window.scrollTo({top:0, behavior:'smooth'});
+            }
+            renderVerificationProjectSummary();
+        }
+
+        /**
+         * Renders a detailed summary and tracker for a specific project
+         */
+        function renderVerificationProjectSummary(){
+            const box=document.getElementById('verificationProjectSummary');
+            if(currentVerificationView==='history'){
+                box.innerHTML='<div class="empty">History is read-only. No edit, update, or delete actions are available here.</div>';
+                return;
+            }
+            if(!selectedVerificationProjectId){
+                box.innerHTML='<div class="empty">Select a project from the table to view stage details.</div>';
+                return;
+            }
+            const tender=tenders.find(item=>String(item.proj_id)===String(selectedVerificationProjectId));
+            const ordered=StageWorkflow.resolveStages(stageOrderForTender(selectedVerificationProjectId));
+            if(!tender||!ordered.length){
+                box.innerHTML='<div class="empty">No stage data found for the selected project.</div>';
+                return;
+            }
+            const counts=StageWorkflow.counts(ordered);
+            const active=currentVerifiableStage(selectedVerificationProjectId);
+            box.innerHTML=`<div class="stage-item" style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><strong>${esc(tender['Name']||'Untitled Tender')}</strong><button type="button" class="btn2" style="padding:6px 12px;font-size:13px;" onclick="closeVerificationProject()"><i class="ph ph-x"></i> Close Project View</button></div><p>${esc(tender['Description']||'No description available.')}</p><p><strong>Budget:</strong> ${esc(tender['Budget']||'-')} | <strong>Total Stages:</strong> ${ordered.length} | <strong>Verified:</strong> ${counts.verified} | <strong>Paid:</strong> ${counts.paid}</p><p><strong>Current Stage:</strong> ${esc(active?.stage_name||'All stages paid')}</p><div style="display:grid;gap:8px;margin-top:10px;">${ordered.map(stage=>`<div style="padding:10px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;"><strong>${esc(stage.stage_name)}</strong><div style="font-size:13px;color:#64748b;">Deadline: ${esc(stage.end_date||'-')} | Amount: ${esc(stage.stage_amount||'-')} | Status: ${esc(stage.displayStatus||stage.status)}</div><div style="font-size:13px;color:#64748b;">Proof: ${stage.proof_image_url?`Available`:`Not uploaded`}</div></div>`).join('')}</div></div>`;
+        }
+
+        /**
+         * Project Selection Logic
+         */
+        function openVerificationProject(tenderId){
+            selectedVerificationProjectId=tenderId;
+            renderVerificationProjectSummary();
+        }
+        function closeVerificationProject(){
+            selectedVerificationProjectId='';
+            renderVerificationProjectSummary();
+        }
+
+        /**
+         * Fills the verification form with project and stage details for processing
+         */
+        function fillFormFromTender(tenderId,status='Approved'){
+            if(currentVerificationView!=='active') switchVerificationView('active');
+            selectedVerificationProjectId=tenderId;
+            const stage=latestStageForTender(tenderId,{requireDb:true});
+            if(!stage){note('No database-saved stage update found for this tender.','warn');return false}
+            const stageStatus=normalizedStageStatus(stage);
+            if(stageStatus!=='Completed'){note('Only the current completed stage can be verified.','warn');return false}
+            const existing=verificationForStage(stage.stage_id)||verificationForTender(tenderId);
+            editingId=existing?.['Verific_no']||null;
+            document.getElementById('verificationNumber').value=existing?.['Verific_no']||'Auto-generated';
+            document.getElementById('projectId').value=tenderId;
+            document.getElementById('stageId').value=stage.stage_id||'';
+            document.getElementById('verificationStatus').value=existing?.['Verification Satus']||status;
+            document.getElementById('remarks').value=existing?.['Remarks']||stage.remarks||'';
+            renderStageImagePreview(stage);
+            renderVerificationProjectSummary();
+            return true;
+        }
+
+        /**
+         * Action: One-click Approve/Reject from the table
+         */
+        async function quickVerify(tenderId,status){
+            if(!fillFormFromTender(tenderId,status))return;
+            await saveVerification();
+        }
+
+        /**
+         * Helper: Finds an existing verification ID for a given stage ID
+         */
+        async function resolveVerificationIdByStage(stageId){
+            const local=verificationForStage(stageId);
+            if(local?.['Verific_no']) return Number(local['Verific_no']);
+            const lookup=await supabaseClient.from('Verification').select('Verific_no').eq('stage_id',stageId).limit(1).maybeSingle();
+            if(lookup.error){
+                console.warn('Verification lookup failed for stage_id',stageId,lookup.error);
+                return null;
+            }
+            return lookup.data?.Verific_no ? Number(lookup.data.Verific_no) : null;
+        }
+
+        /**
+         * Core Logic: Saves or Updates verification in the database and updates stage tracking status
+         */
+        async function saveVerification(){
+            const projectId=document.getElementById('projectId').value.trim();
+            const stageId=document.getElementById('stageId').value.trim();
+            const verificationStatus=document.getElementById('verificationStatus').value;
+            const remarks=document.getElementById('remarks').value.trim();
+
+            if(!projectId||!stageId||!verificationStatus){
+                note('Fill all required fields.','err');
+                return;
+            }
+
+            // Prepare payload for Supabase
+            const payload={
+                proj_id: projectId,
+                stage_id: stageId,
+                'Verification Satus': verificationStatus,
+                Remarks: remarks,
+                Payment_Approval: verificationStatus==='Approved' ? 'Pending' : 'Rejected'
+            };
+
+            let targetVerificationId=editingId ? Number(editingId) : await resolveVerificationIdByStage(stageId);
+            let response=targetVerificationId
+                ? await supabaseClient.from('Verification').update(payload).eq('Verific_no',targetVerificationId)
+                : await supabaseClient.from('Verification').insert([payload]);
+
+            // Handle potential database constraints or race conditions
+            let errorText=[response.error?.message,response.error?.details,response.error?.hint].filter(Boolean).join(' ');
+            if(response.error && /Verification_stage_id_key|duplicate key value violates unique constraint/i.test(errorText)){
+                const existingId=await resolveVerificationIdByStage(stageId);
+                if(existingId){
+                    editingId=existingId;
+                    document.getElementById('verificationNumber').value=existingId;
+                    response=await supabaseClient.from('Verification').update(payload).eq('Verific_no',existingId);
+                    errorText=[response.error?.message,response.error?.details,response.error?.hint].filter(Boolean).join(' ');
+                }
+            }
+            if(response.error && /Verification_stage_id_fkey/i.test(errorText)){
+                response=editingId
+                    ? await supabaseClient.from('Verification').update({...payload,stage_id:null}).eq('Verific_no',Number(editingId))
+                    : await supabaseClient.from('Verification').insert([{...payload,stage_id:null}]);
+            }
+
+            if(response.error){
+                console.error(response.error);
+                note(`Unable to save verification: ${response.error.message}`,'err');
+                return;
+            }
+
+            // Sync Verification Status back to 'Stage Tracking' table
+            const stageStatusUpdate=verificationStatus==='Approved'?'Verified':'Rejected';
+            const stageFieldUpdate={status:stageStatusUpdate,payment_status:verificationStatus==='Approved'?'Pending':'Rejected',payment_date:null};
+            let stageUpdate=await supabaseClient.from('Stage Tracking').update(stageFieldUpdate).eq('stage_id',stageId);
+            if(stageUpdate.error){
+                stageUpdate=await supabaseClient.from('Stage Tracking').update({status:stageStatusUpdate}).eq('stage_id',stageId);
+                if(stageUpdate.error) console.error(stageUpdate.error);
+            }
+            
+            // Local fallback synchronization
+            const localStageUpdates=getLocalStages().map(stage=>String(stage.stage_id)===String(stageId)?{...stage,status:stageStatusUpdate,payment_status:verificationStatus==='Approved'?'Pending':'Rejected',payment_date:''}:stage);
+            setLocalStages(localStageUpdates);
+            const stageMeta=JSON.parse(localStorage.getItem('contractorStageMeta')||'{}');
+            stageMeta[stageId]={...(stageMeta[stageId]||{}),payment_status:verificationStatus==='Approved'?'Pending':'Rejected',payment_date:'',remarks};
+            localStorage.setItem('contractorStageMeta',JSON.stringify(stageMeta));
+
+            // Recalculate contractor performance rating based on this verification
+            try{
+                await PerformanceSystem.syncContractorPerformance(supabaseClient,{persist:true});
+            }catch(error){
+                console.error(error);
+            }
+
+            note('Verification saved successfully.','ok');
+            clearForm();
+            await loadData();
+        }
+
+        /**
+         * Deletes a verification record (Admin/Maintenance use)
+         */
+        async function deleteVerification(id){
+            if(!confirm('Delete this verification record?'))return;
+            const response=await supabaseClient.from('Verification').delete().eq('Verific_no',Number(id));
+            if(response.error){
+                console.error(response.error);
+                note(`Unable to delete verification: ${response.error.message}`,'err');
+                return;
+            }
+            try{
+                await PerformanceSystem.syncContractorPerformance(supabaseClient,{persist:true});
+            }catch(error){
+                console.error(error);
+            }
+            note('Verification deleted successfully.','ok');
+            clearForm();
+            await loadData();
+        }
+
+        /**
+         * Loads a verification record into the form for manual editing
+         */
+        function editVerification(id){
+            const item=verifications.find(record=>String(record['Verific_no'])===String(id));
+            if(!item)return;
+            editingId=item['Verific_no'];
+            document.getElementById('verificationNumber').value=item['Verific_no']||'Auto-generated';
+            document.getElementById('projectId').value=item.proj_id||'';
+            document.getElementById('stageId').value=item.stage_id||'';
+            document.getElementById('verificationStatus').value=item['Verification Satus']||'';
+            document.getElementById('remarks').value=item['Remarks']||'';
+        }
+
+        /**
+         * Action: Initiates a new verification for a specific project
+         */
+        function editVerificationByTender(tenderId){
+            if(fillFormFromTender(tenderId,'Pending')){
+                note('Verification form filled for selected tender.','ok');
+            }
+        }
+
+        /**
+         * Form Image Preview Logic
+         */
+        function renderStageImagePreview(stage){
+            const previewContainer=document.getElementById('stageImagePreviewContainer');
+            const preview=document.getElementById('stageImagePreview');
+            const proofUrl=stage?.proof_image_url||stage?.image_url;
+            if(proofUrl){
+                previewContainer.style.display='block';
+                preview.innerHTML=`<img src="${proofUrl}" alt="Stage Image" style="max-width:100%;height:auto;border-radius:8px;">`;
+            }else{
+                previewContainer.style.display='none';
+                preview.innerHTML='';
+            }
+        }
+
+        /**
+         * Opens the stage proof image in a new browser tab for closer inspection
+         */
+        function viewStageImage(stageId){
+            const stage=stages.find(item=>String(item.stage_id)===String(stageId));
+            const proofUrl=stage?.proof_image_url||stage?.image_url;
+            if(!proofUrl){note('No image found for this stage.','warn');return}
+            const imageWindow=window.open('', '_blank');
+            if(imageWindow){
+                imageWindow.document.write(`<title>Stage Image</title><img src="${proofUrl}" alt="Stage Image" style="max-width:100%;height:auto;display:block;margin:24px auto;">`);
+            }
+        }
+
+        /**
+         * Resets the form state and clears inputs
+         */
+        function clearForm(){
+            editingId=null;
+            form.reset();
+            document.getElementById('verificationNumber').value='Auto-generated';
+            document.getElementById('projectId').value='';
+            document.getElementById('stageId').value='';
+            renderStageImagePreview(null);
+        }
+
+        // Form Submit Event Handler
+        form.addEventListener('submit',async e=>{
+            e.preventDefault();
+            await saveVerification();
+        });
+
+        // Expose functions to the global window object for HTML onclick handlers
+        window.editVerification=editVerification;
+        window.editVerificationByTender=editVerificationByTender;
+        window.openVerificationProject=openVerificationProject;
+        window.closeVerificationProject=closeVerificationProject;
+        window.switchVerificationView=switchVerificationView;
+        window.clearForm=clearForm;
+        window.quickVerify=quickVerify;
+
+        /**
+         * Initialization: Runs when the DOM is fully loaded
+         */
+        window.addEventListener('DOMContentLoaded',async()=>{
+            loadUserInfo();
+            clearForm();
+            await loadData();
+            switchVerificationView('active');
+            
+            // Auto-refresh every 15 seconds to keep dashboard data live
+            setInterval(loadData, 15000);
+            
+            // Supabase Realtime: Instant UI refresh on database changes for high collaboration
+            try {
+                supabaseClient.channel('verification-realtime')
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Project'},()=>loadData())
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Verification'},()=>loadData())
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Stage Tracking'},()=>loadData())
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Applications'},()=>loadData())
+                    .subscribe();
+            } catch(e){ console.warn('Realtime subscription not available, using polling only.',e); }
+        });
+    </script>
+</body>
+</html>

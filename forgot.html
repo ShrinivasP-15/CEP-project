@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Forgot Password - Tender Monitoring System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="auth.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+
+<body class="auth-page auth-login-page">
+    <div class="auth-shell auth-shell-simple">
+        <section class="auth-left auth-left-simple">
+            <div class="auth-brand">
+                <div class="auth-brand-mark"><i class="ph ph-buildings"></i></div>
+                <div>
+                    <div class="auth-brand-kicker">Official Portal</div>
+                    <h1>Tender Monitoring System</h1>
+                </div>
+            </div>
+
+            <div class="auth-left-copy">
+                <p class="auth-hero-title">Reset access securely.</p>
+                <p class="auth-hero-desc">Use your registered email address to request a password reset link for the portal.</p>
+            </div>
+
+            <div class="auth-illustration auth-illustration-small" aria-hidden="true">
+                <div class="illustration-skyline"></div>
+                <div class="illustration-bridge"></div>
+            </div>
+        </section>
+
+        <section class="auth-right">
+            <div class="auth-card auth-login-card">
+                <h2>Forgot Password</h2>
+                <p class="auth-subtitle">Enter your registered email to receive a password reset link.</p>
+
+                <form>
+                    <div class="field-group">
+                        <label class="field-label" for="forgotEmail">Email Address</label>
+                        <div class="input-shell">
+                            <i class="ph ph-envelope-simple input-icon"></i>
+                            <input class="auth-input input-with-icon" id="forgotEmail" type="email" placeholder="Enter your email" required>
+                        </div>
+                    </div>
+
+                    <button class="auth-button auth-button-primary" type="submit">
+                        <i class="ph ph-paper-plane-tilt"></i>
+                        Send Reset Link
+                    </button>
+
+                    <a href="login.html" class="auth-secondary-button auth-register-button">
+                        <i class="ph ph-arrow-left"></i>
+                        Back to Login
+                    </a>
+                </form>
+            </div>
+        </section>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script>
+    document.querySelector('form').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const email = document.getElementById('forgotEmail').value.trim();
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        if (!email) {
+            alert('Please enter your email.');
+            return;
+        }
+
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="ph ph-circle-notch"></i> Sending...';
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('users')
+                .select('id')
+                .eq('email', email)
+                .limit(1);
+
+            if (error) {
+                console.error(error);
+                alert('Unable to send reset link at the moment.');
+                return;
+            }
+
+            if (data && data.length > 0) {
+                alert('If this email is registered, a reset link has been sent.');
+            } else {
+                alert('Email not found. Please check and try again.');
+            }
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    });
+</script>
+</body>
+</html>

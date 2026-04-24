@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Management Dashboard | Public Works Monitoring System</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 30px; }
+        .card-link { display: inline-flex; justify-content: center; align-items: center; gap: 8px; margin-top: 15px; }
+        .stat-item { background: #fff; padding: 24px; border-radius: 8px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); text-align: center; }
+        .stat-number { font-size: 36px; font-weight: 700; color: var(--primary); }
+        .stat-label { color: var(--text-muted); font-size: 14px; margin-top: 8px; font-weight: 600; text-transform: uppercase; }
+        .features { background: #fff; border: 1px solid var(--border); border-left: 4px solid var(--warning); padding: 24px; border-radius: 8px; margin-top: 24px; box-shadow: var(--shadow-sm); }
+        .features li { padding: 8px 0 8px 28px; position: relative; color: var(--text-muted); }
+        .features li::before { content: "✓"; position: absolute; left: 0; color: var(--success); font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <aside class="side">
+            <div>
+                <h1>Public Works Portal</h1>
+            </div>
+            <div class="nav">
+                <button type="button" class="active"><i class="ph ph-squares-four"></i> Dashboard</button>
+                <button type="button" onclick="window.location.href='project-management.html'"><i class="ph ph-files"></i> Tenders</button>
+                <button type="button" onclick="window.location.href='verification-management.html'"><i class="ph ph-check-circle"></i> Verifications</button>
+            </div>
+        </aside>
+        <div class="main">
+        <div class="top">
+            <div>
+                <h2>Management Dashboard</h2>
+                <p>Public Works Monitoring System</p>
+            </div>
+            <div class="topr">
+                <div class="user">
+                    <strong id="welcomeMsg">Welcome</strong>
+                    <small id="userRole">Role</small>
+                </div>
+                <button class="logout" onclick="logout()"><i class="ph ph-sign-out"></i> Logout</button>
+            </div>
+        </div>
+
+        <div>
+            <div class="grid">
+                <!-- Project Management Card -->
+                <div class="card" style="text-align: center;">
+                    <i class="ph-duotone ph-folder-open" style="font-size: 48px; color: var(--primary); margin-bottom: 15px;"></i>
+                    <h3 style="margin-bottom: 12px; font-size: 20px;">Project Management</h3>
+                    <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Create, view, update and manage project records. Track project details, timelines, and assigned officers.</p>
+                    <a href="project-management.html" class="btn card-link">Manage Projects</a>
+                </div>
+
+                <div class="card" style="text-align: center;">
+                    <i class="ph-duotone ph-check-circle" style="font-size: 48px; color: var(--success); margin-bottom: 15px;"></i>
+                    <h3 style="margin-bottom: 12px; font-size: 20px;">Verification Management</h3>
+                    <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Manage verification records, approve payments, and track verification statuses with detailed remarks.</p>
+                    <a href="verification-management.html" class="btn card-link">Manage Verifications</a>
+                </div>
+            </div>
+
+            <!-- Statistics Section -->
+            <div style="margin-top: 30px;">
+                <h3 style="font-size: 18px; margin-bottom: 15px;"><i class="ph ph-chart-bar" style="color: var(--primary);"></i> System Statistics</h3>
+                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div class="stat-item" style="border-left-color: var(--primary);">
+                        <div class="stat-number" id="projectCount">0</div>
+                        <div class="stat-label">Total Projects</div>
+                    </div>
+                    <div class="stat-item" style="border-left-color: var(--success);">
+                        <div class="stat-number" id="verificationCount">0</div>
+                        <div class="stat-label">Total Verifications</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Features Section -->
+            <div class="features">
+                <h3 style="font-size: 18px; margin-bottom: 15px;"><i class="ph ph-target" style="color: var(--warning);"></i> Key Features</h3>
+                <ul>
+                    <li>Complete CRUD operations (Create, Read, Update, Delete)</li>
+                    <li>Real-time data storage using Supabase</li>
+                    <li>Form validation and error handling</li>
+                    <li>Responsive design for all devices</li>
+                    <li>Easy-to-use interface for all users</li>
+                    <li>Date validation and status tracking</li>
+                    <li>Automatic ID generation for records</li>
+                    <li>Quick links between related modules</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="auth-session.js"></script>
+    <script>
+        function loadUserInfo() {
+            const currentUser = AuthSession.getCurrentUser();
+            if (!currentUser) {
+                window.location.href = 'login.html';
+                return;
+            }
+            document.getElementById('welcomeMsg').textContent = `Welcome, ${currentUser.username}!`;
+            document.getElementById('userRole').textContent = `Role: ${currentUser.role}`;
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                AuthSession.clearCurrentUser();
+                window.location.href = 'login.html';
+            }
+        }
+
+        async function updateStats() {
+            const [projectsRes, verificationRes] = await Promise.all([
+                supabaseClient.from('Project').select('proj_id', { count: 'exact' }),
+                supabaseClient.from('Verification').select('Verific_no', { count: 'exact' })
+            ]);
+
+            const projectCount = projectsRes.count ?? projectsRes.data?.length ?? 0;
+            const verificationCount = verificationRes.count ?? verificationRes.data?.length ?? 0;
+
+            document.getElementById('projectCount').textContent = projectCount;
+            document.getElementById('verificationCount').textContent = verificationCount;
+        }
+
+        window.addEventListener('DOMContentLoaded', async function() {
+            loadUserInfo();
+            await updateStats();
+            setInterval(updateStats, 5000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>History | Public Works Monitoring System</title>
+    <link rel="stylesheet" href="dashboard.css">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div class="app">
+        <aside class="side">
+            <div>
+                <h1>Public Works Portal</h1>
+            </div>
+            <div class="nav">
+                <button type="button" onclick="window.location.href='project-management.html'"><i class="ph ph-squares-four"></i> Dashboard</button>
+                <button type="button" onclick="window.location.href='project-management.html#projects'"><i class="ph ph-files"></i> Tenders</button>
+                <button type="button" onclick="window.location.href='project-management.html#add'"><i class="ph ph-plus-circle"></i> Publish Tender</button>
+                <button type="button" onclick="window.location.href='applications.html'"><i class="ph ph-check-circle"></i> Applications</button>
+                <button type="button" onclick="window.location.href='contractor-performance.html'"><i class="ph ph-chart-line-up"></i> Contractor Performance</button>
+                <button type="button" class="active"><i class="ph-fill ph-archive-box"></i> History</button>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="top">
+                <div>
+                    <h2>History Archive</h2>
+                    <p>Read-only full record of projects, applications, and stage progress.</p>
+                </div>
+                <div class="topr">
+                    <div class="user"><strong id="welcomeMsg">Welcome, Admin</strong><small id="userRole">Role: Admin</small></div>
+                    <button class="logout" onclick="logout()"><i class="ph ph-sign-out"></i> Logout</button>
+                </div>
+            </div>
+
+            <div id="message" class="msg"></div>
+
+            <div class="card">
+                <div class="toolbar">
+                    <select id="projectStatusFilter">
+                        <option value="all">All Project Statuses</option>
+                    </select>
+                    <select id="contractorFilter">
+                        <option value="all">All Contractors</option>
+                    </select>
+                    <input id="fromDateFilter" type="date" title="Show records from this date onwards">
+                    <button type="button" class="btn2" onclick="resetFilters()">Reset Filters</button>
+                </div>
+            </div>
+
+            <div class="head">
+                <h3>All Projects</h3>
+                <p>Displays all projects: Open, Assigned, In Progress, and Closed.</p>
+            </div>
+            <div class="card">
+                <div class="wrap admin-scroll-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Project ID</th>
+                                <th>Project Name</th>
+                                <th>Status</th>
+                                <th>Contractor</th>
+                                <th>Deadline</th>
+                                <th>Total Stages</th>
+                                <th>Completed</th>
+                                <th>Verified</th>
+                                <th>Payment</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyProjectsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="head" style="margin-top:18px;">
+                <h3>All Applications</h3>
+                <p>Displays all applications: Pending, Accepted, Rejected, and Archived.</p>
+            </div>
+            <div class="card">
+                <div class="wrap admin-scroll-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Application ID</th>
+                                <th>Tender Title</th>
+                                <th>Contractor Name</th>
+                                <th>Contractor ID</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyApplicationsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="auth-session.js"></script>
+    <script src="stage-workflow.js"></script>
+    <script>
+        const APPLICATIONS_STORAGE_KEY='applications';
+        const TENDER_META_KEY='tenderMeta';
+        const STAGE_UPDATE_KEY='contractorStageUpdates';
+        const messageBox=document.getElementById('message');
+        const projectStatusFilter=document.getElementById('projectStatusFilter');
+        const contractorFilter=document.getElementById('contractorFilter');
+        const fromDateFilter=document.getElementById('fromDateFilter');
+        let projects=[],applications=[],stages=[];
+        let stageSummaryByProject={};
+
+        function note(text,type){messageBox.textContent=text;messageBox.className=`msg ${type}`;setTimeout(()=>messageBox.className='msg',3500)}
+        function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+        function getTenderMeta(){try{return JSON.parse(localStorage.getItem(TENDER_META_KEY)||'{}')}catch{return {}}}
+        function mergeTenderMeta(list){const meta=getTenderMeta();return list.map(item=>meta[item.proj_id]?{...item,...meta[item.proj_id]}:item)}
+        function getLocalApplications(){try{return JSON.parse(localStorage.getItem(APPLICATIONS_STORAGE_KEY)||'[]')}catch{return[]}}
+        function getLocalStages(){try{return JSON.parse(localStorage.getItem(STAGE_UPDATE_KEY)||'[]')}catch{return[]}}
+        function asStatus(value){return value||'Pending'}
+
+        function parseDate(value){
+            if(!value) return null;
+            const date=new Date(value);
+            return Number.isNaN(date.getTime()) ? null : date;
+        }
+
+        function formatDate(value){
+            const parsed=parseDate(value);
+            return parsed ? parsed.toISOString().split('T')[0] : '-';
+        }
+
+        function statusBadge(value){
+            const status=String(value||'').toLowerCase();
+            if(status==='closed'||status==='approved'||status==='accepted'||status==='released'||status==='verified'||status==='paid'){
+                return `<span class="badge g">${esc(value)}</span>`;
+            }
+            if(status==='rejected'||status==='blacklisted'){
+                return `<span class="badge r">${esc(value)}</span>`;
+            }
+            if(status==='archived'||status==='old'){
+                return `<span class="badge y">Archived</span>`;
+            }
+            return `<span class="badge p">${esc(value||'Pending')}</span>`;
+        }
+
+        function contractorKey(record){
+            return String(
+                record?.assigned_contractor_id ??
+                record?.['Assigned officer'] ??
+                record?.['assigned contractor'] ??
+                record?.contractor_id ??
+                ''
+            ).trim();
+        }
+
+        function projectStatus(project){
+            const projectStages=stages.filter(stage=>String(stage?.full_proj_id ?? stage?.proj_id ?? '')===String(project?.proj_id ?? ''));
+            return window.StageWorkflow?.deriveProjectStatus ? window.StageWorkflow.deriveProjectStatus(project,projectStages) : (String(project?.Status ?? project?.status ?? 'Open').trim() || 'Open');
+        }
+
+        function projectDate(project){
+            return project?.['Start Date'] || project?.['End Date'] || project?.start_date || project?.end_date || project?.created_at || null;
+        }
+
+        function applicationDate(application){
+            return application?.created_at || application?.application_date || application?.date || null;
+        }
+
+        function refreshFilterOptions(){
+            const statuses=[...new Set(projects.map(project=>projectStatus(project)).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+            const selectedStatus=projectStatusFilter.value || 'all';
+            projectStatusFilter.innerHTML=`<option value="all">All Project Statuses</option>${statuses.map(status=>`<option value="${esc(status)}">${esc(status)}</option>`).join('')}`;
+            if(statuses.includes(selectedStatus)){projectStatusFilter.value=selectedStatus}
+
+            const contractorValues=new Set();
+            projects.forEach(project=>{const key=contractorKey(project);if(key) contractorValues.add(key);});
+            applications.forEach(application=>{const key=String(application.contractor_id||'').trim();if(key) contractorValues.add(key);});
+            const contractorList=[...contractorValues].sort((a,b)=>a.localeCompare(b));
+            const selectedContractor=contractorFilter.value || 'all';
+            contractorFilter.innerHTML=`<option value="all">All Contractors</option>${contractorList.map(contractor=>`<option value="${esc(contractor)}">${esc(contractor)}</option>`).join('')}`;
+            if(contractorList.includes(selectedContractor)){contractorFilter.value=selectedContractor}
+        }
+
+        function buildStageSummary(){
+            const grouped={};
+            stages.forEach(stage=>{
+                const key=String(stage?.proj_id ?? stage?.full_proj_id ?? '').trim();
+                if(!key) return;
+                if(!grouped[key]) grouped[key]=[];
+                grouped[key].push(stage);
+            });
+
+            stageSummaryByProject={};
+            Object.entries(grouped).forEach(([projId,projectStages])=>{
+                const total=projectStages.length;
+                const normalized=window.StageWorkflow?.resolveStages ? window.StageWorkflow.resolveStages(projectStages) : projectStages;
+                const completed=normalized.filter(stage=>['Completed','Verified','Paid'].includes(String(stage?.status||''))).length;
+                const verified=normalized.filter(stage=>['Verified','Paid'].includes(String(stage?.status||''))).length;
+                const paid=normalized.filter(stage=>{
+                    const payment=window.StageWorkflow?.normalizePaymentStatus ? window.StageWorkflow.normalizePaymentStatus(stage) : String(stage?.payment_status||'Pending');
+                    return payment==='Released' || String(stage?.status||'')==='Paid';
+                }).length;
+                stageSummaryByProject[projId]={
+                    total,
+                    completed,
+                    verified,
+                    payment: total>0 && paid===total ? 'Released' : 'Pending'
+                };
+            });
+        }
+
+        function isVisibleByDate(value,fromDate){
+            if(!fromDate) return true;
+            const parsed=parseDate(value);
+            if(!parsed) return false;
+            const from=parseDate(fromDate);
+            if(!from) return true;
+            parsed.setHours(0,0,0,0);
+            from.setHours(0,0,0,0);
+            return parsed >= from;
+        }
+
+        function filteredProjects(){
+            const selectedStatus=projectStatusFilter.value || 'all';
+            const selectedContractor=contractorFilter.value || 'all';
+            const fromDate=fromDateFilter.value || '';
+            return projects.filter(project=>{
+                const status=projectStatus(project);
+                const contractor=contractorKey(project);
+                const matchesStatus=selectedStatus==='all' || status===selectedStatus;
+                const matchesContractor=selectedContractor==='all' || contractor===selectedContractor;
+                const matchesDate=isVisibleByDate(projectDate(project),fromDate);
+                return matchesStatus && matchesContractor && matchesDate;
+            });
+        }
+
+        function filteredApplications(){
+            const selectedStatus=projectStatusFilter.value || 'all';
+            const selectedContractor=contractorFilter.value || 'all';
+            const fromDate=fromDateFilter.value || '';
+            return applications.filter(application=>{
+                const tender=projects.find(project=>String(project.proj_id)===String(application.tender_id));
+                const matchesProjectStatus=selectedStatus==='all' || (tender && projectStatus(tender)===selectedStatus);
+                const contractor=String(application.contractor_id||'').trim();
+                const matchesContractor=selectedContractor==='all' || contractor===selectedContractor;
+                const matchesDate=isVisibleByDate(applicationDate(application),fromDate);
+                return matchesProjectStatus && matchesContractor && matchesDate;
+            });
+        }
+
+        function renderProjectsHistory(){
+            const body=document.getElementById('historyProjectsBody');
+            const items=filteredProjects();
+            if(!items.length){
+                body.innerHTML='<tr><td colspan="9"><div class="empty">No projects found for the selected filters.</div></td></tr>';
+                return;
+            }
+            body.innerHTML=items.map(project=>{
+                const summary=stageSummaryByProject[String(project.proj_id)]||{total:0,completed:0,verified:0,payment:'Pending'};
+                return `<tr>
+                    <td>${esc(project.proj_id||'-')}</td>
+                    <td>${esc(project['Name']||'Untitled Tender')}</td>
+                    <td>${statusBadge(projectStatus(project))}</td>
+                    <td>${esc(contractorKey(project)||'Not Assigned')}</td>
+                    <td>${esc(project['End Date']||project.end_date||'-')}</td>
+                    <td>${esc(summary.total)}</td>
+                    <td>${esc(summary.completed)}</td>
+                    <td>${esc(summary.verified)}</td>
+                    <td>${statusBadge(summary.payment)}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderApplicationsHistory(){
+            const body=document.getElementById('historyApplicationsBody');
+            const items=filteredApplications();
+            if(!items.length){
+                body.innerHTML='<tr><td colspan="6"><div class="empty">No applications found for the selected filters.</div></td></tr>';
+                return;
+            }
+            body.innerHTML=items.map(application=>{
+                const tender=projects.find(project=>String(project.proj_id)===String(application.tender_id));
+                return `<tr>
+                    <td>${esc(application.application_id||'-')}</td>
+                    <td>${esc(tender?.['Name']||application.tender_id||'Unknown Tender')}</td>
+                    <td>${esc(application.contractor_name||'-')}</td>
+                    <td>${esc(application.contractor_id||'-')}</td>
+                    <td>${statusBadge(asStatus(application.status))}</td>
+                    <td>${esc(formatDate(applicationDate(application)))}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function render(){
+            renderProjectsHistory();
+            renderApplicationsHistory();
+        }
+
+        function resetFilters(){
+            projectStatusFilter.value='all';
+            contractorFilter.value='all';
+            fromDateFilter.value='';
+            render();
+        }
+
+        function loadUserInfo(){
+            const user=AuthSession.getCurrentUser();
+            if(!user){
+                if(window.location.protocol==='file:'){
+                    alert('Session not found in this tab.\n\nIf you opened this page using file:// or in a new browser tab, the login session may not be shared.\n\nRun the project on http://localhost (Live Server or node serve-localhost.js) and navigate from the dashboard.');
+                }
+                window.location.href='login.html';
+                return;
+            }
+            if(!AuthSession.hasRole(user,'Admin')){window.location.href='login.html';return}
+            document.getElementById('welcomeMsg').textContent=`Welcome, ${user.username}`;
+            document.getElementById('userRole').textContent=`Role: ${user.role}`;
+        }
+
+        function logout(){
+            if(confirm('Are you sure you want to logout?')){
+                AuthSession.clearCurrentUser();
+                window.location.href='login.html';
+            }
+        }
+
+        async function loadData(){
+            const [projectRes,applicationsRes,stageRes]=await Promise.all([
+                supabaseClient.from('Project').select('*').order('Start Date',{ascending:false}),
+                supabaseClient.from('Applications').select('*').order('application_id',{ascending:false}),
+                supabaseClient.from('Stage Tracking').select('*')
+            ]);
+
+            if(projectRes.error){
+                console.error(projectRes.error);
+                note('Unable to load project history.','err');
+                return;
+            }
+            projects=mergeTenderMeta(projectRes.data||[]);
+
+            if(applicationsRes.error){
+                console.error(applicationsRes.error);
+                applications=getLocalApplications();
+                note('Applications table unavailable in database, showing local records only.','warn');
+            }else{
+                applications=applicationsRes.data||[];
+            }
+
+            if(stageRes.error){
+                console.error(stageRes.error);
+                stages=getLocalStages();
+                note('Stage Tracking table unavailable in database, using local stage data.','warn');
+            }else{
+                stages=stageRes.data||[];
+            }
+
+            buildStageSummary();
+            refreshFilterOptions();
+            render();
+        }
+
+        window.addEventListener('DOMContentLoaded',async()=>{
+            loadUserInfo();
+            projectStatusFilter.addEventListener('change',render);
+            contractorFilter.addEventListener('change',render);
+            fromDateFilter.addEventListener('change',render);
+
+            await loadData();
+            setInterval(loadData,15000);
+            try{
+                supabaseClient.channel('history-realtime')
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Project'},()=>loadData())
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Applications'},()=>loadData())
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Stage Tracking'},()=>loadData())
+                    .subscribe();
+            }catch(e){
+                console.warn('Realtime unavailable, polling only.',e);
+            }
+        });
+    </script>
+</body>
+</html>

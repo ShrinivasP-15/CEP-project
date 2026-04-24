@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | Public Works Monitoring System</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="admin-dashboard.css">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body class="admin-dashboard-page">
+    <!-- Application Header: Branding and Live Date -->
+    <header class="portal-header">
+        <div class="portal-brand">
+            <div class="portal-brand-mark"><i class="ph-fill ph-buildings"></i></div>
+            <div class="portal-brand-copy">
+                <div class="portal-brand-title">TENDER MONITORING SYSTEM</div>
+                <div class="portal-brand-subtitle">Demo Portal</div>
+            </div>
+        </div>
+        <div class="portal-date">
+            <i class="ph ph-calendar-dots"></i>
+            <span data-live-date>Loading...</span>
+        </div>
+    </header>
+    <nav class="portal-nav">
+        <div class="portal-nav-links">
+            <a href="index.html" class="portal-nav-link active"><i class="ph ph-house"></i>Home</a>
+            <a href="index.html#about" class="portal-nav-link">About</a>
+            <a href="forgot.html" class="portal-nav-link">Help</a>
+        </div>
+    </nav>
+    <div class="app">
+        <!-- Sidebar Navigation: Primary dashboard links -->
+        <aside class="side">
+            <div>
+                <h1>Works Portal</h1>
+            </div>
+            <div class="nav">
+                <button class="navbtn active" data-sec="dash"><i class="ph ph-squares-four"></i> Dashboard</button>
+                <button class="navbtn" data-sec="projects"><i class="ph ph-files"></i> Tenders</button>
+                <button class="navbtn" data-sec="add"><i class="ph ph-plus-circle"></i> Publish Tender</button>
+                <button class="navbtn" type="button" onclick="window.location.href='applications.html'"><i class="ph ph-check-circle"></i> Applications</button>
+                <button class="navbtn" type="button" onclick="window.location.href='contractor-performance.html'"><i class="ph ph-chart-line-up"></i> Contractor Performance</button>
+                <button class="navbtn" type="button" onclick="window.location.href='history.html'"><i class="ph ph-archive-box"></i> History</button>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="top">
+                <div>
+                    <h2>Admin Dashboard</h2>
+                    <p>Track tender status, review alerts, and manage tender records.</p>
+                </div>
+                <div class="topr">
+                    <div class="user"><strong id="welcomeMsg">Welcome, Admin</strong><small id="userRole">Role: Admin</small></div>
+                    <button class="logout" onclick="logout()"><i class="ph ph-sign-out"></i> Logout</button>
+                </div>
+            </div>
+
+            <div id="message" class="msg"></div>
+
+            <!-- Dashboard Overview Section: Stats and quick summaries -->
+            <section id="dash" class="sec active">
+                <div class="head"><h3>Dashboard</h3><p>Basic stats, recent tender updates, alerts, and overdue tender list.</p></div>
+                <!-- Statistical Counters -->
+                <div class="stats">
+                    <div class="stat"><i class="ph-duotone ph-files" style="font-size: 32px; color: var(--primary); margin-bottom: 8px;"></i><small>Total Tenders</small><strong id="stTotal">0</strong></div>
+                    <div class="stat"><i class="ph-duotone ph-check-circle" style="font-size: 32px; color: var(--success); margin-bottom: 8px;"></i><small>On Track</small><strong id="stTrack">0</strong></div>
+                    <div class="stat"><i class="ph-duotone ph-warning-circle" style="font-size: 32px; color: var(--danger); margin-bottom: 8px;"></i><small>Delayed</small><strong id="stDelay">0</strong></div>
+                    <div class="stat"><i class="ph-duotone ph-lock-key" style="font-size: 32px; color: var(--purple); margin-bottom: 8px;"></i><small>Closed</small><strong id="stDone">0</strong></div>
+                    <div class="stat"><i class="ph-duotone ph-hourglass-medium" style="font-size: 32px; color: var(--warning); margin-bottom: 8px;"></i><small>Pending Verification</small><strong id="stPending">0</strong></div>
+                </div>
+                <!-- Quick Filter Buttons for rapid auditing -->
+                <div class="quick-strip">
+                    <button class="quick-btn danger" onclick="quickFilter('delayed')"><i class="ph ph-clock"></i> Delayed Tenders</button>
+                    <button class="quick-btn warning" onclick="quickFilter('pendingVerification')"><i class="ph ph-hourglass"></i> Verification Remaining</button>
+                    <button class="quick-btn purple" onclick="quickFilter('missedDeadline')"><i class="ph ph-calendar-dots"></i> Overdue Tenders</button>
+                </div>
+                <div class="grid">
+                    <div class="card">
+                        <div class="cardtop"><div><h4>Recent Tenders</h4><p>Latest tender updates sorted by created date.</p></div><button class="btn2" onclick="showSec('projects')">Open Tenders</button></div>
+                        <div class="wrap admin-scroll-wrap">
+                            <table>
+                                <thead><tr><th>Tender Title</th><th>Deadline</th><th>Status</th><th>Verification</th><th>Payment</th><th>Action</th></tr></thead>
+                                <tbody id="recentBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div style="display:grid;gap:18px">
+                        <div class="card" id="nearDeadlineCard">
+                            <div class="cardtop"><div><h4>Alerts</h4></div></div>
+                            <div class="alerts">
+                                <div class="alert a4">
+                                    <div id="alNearBody" class="near-list"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div id="overBody" class="over"></div>
+                            <div class="over-actions">
+                                <button class="btn2" onclick="quickFilter('delayed')">Delayed Tenders</button>
+                                <button class="btn2" onclick="quickFilter('pendingVerification')">Verification Remaining</button>
+                                <button class="btn2" onclick="quickFilter('missedDeadline')">Overdue Tenders</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="projects" class="sec">
+                <div class="head"><h3>Tenders</h3><p>View all tenders, search and filter records, edit or delete, and release payment after approval.</p></div>
+                <div class="card">
+                    <div class="toolbar">
+                        <input id="searchInput" type="text" placeholder="Search by title, contractor, or tender ID">
+                        <select id="statusFilter"><option value="all">All Active Statuses</option><option>Open</option></select>
+                        <select id="verificationFilter"><option value="all">All Verification</option><option>Pending</option><option>In Review</option><option>Approved</option><option>Rejected</option><option>Hold</option></select>
+                        <select id="paymentFilter"><option value="all">All Payments</option><option>Pending</option><option>Approved</option><option>Released</option><option>Rejected</option><option>Partial</option></select>
+                        <button class="btn2" onclick="resetFilters()">Show All Tenders</button>
+                    </div>
+                    <div class="wrap admin-scroll-wrap">
+                        <table>
+                        <thead><tr><th>Tender ID</th><th>Tender Title</th><th>Deadline</th><th>Status</th><th>Verification</th><th>Payment</th><th>Contractor</th><th>Actions</th></tr></thead>
+                            <tbody id="projectBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="add" class="sec">
+                <div class="head"><h3>Publish Tender</h3><p>Create a new tender that will be visible to contractors.</p></div>
+                <div class="card">
+                    <form id="projectForm">
+                        <div class="form">
+                            <div class="fg"><label for="projName">Tender Title *</label><input type="text" id="projName" required placeholder="Enter tender title"></div>
+                            <div class="fg"><label for="budget">Budget *</label><input type="number" id="budget" min="0.01" step="0.01" required placeholder="Enter budget amount"></div>
+                            <div class="fg full"><label for="description">Description</label><textarea id="description" placeholder="Enter tender details"></textarea></div>
+                            <div class="fg"><label for="endDate">Deadline *</label><input type="date" id="endDate" required></div>
+                            <div class="fg"><label for="location">Location *</label><input type="text" id="location" required placeholder="Enter location"></div>
+                            <div class="fg"><label for="pincode">Pincode *</label><input type="number" id="pincode" required placeholder="Enter 6-digit pincode"></div>
+                        </div>
+                        <div class="fbtn"><button type="submit" id="saveBtn" class="btn">Publish Tender</button><button type="button" class="btn2" onclick="cancelProject()">Cancel</button></div>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="portal-footer">
+        <div class="footer-left">
+            <div class="footer-badge"><i class="ph ph-shield-check"></i></div>
+            <div>
+                <div>This is a secure system.</div>
+                <div>Unauthorized access is prohibited.</div>
+            </div>
+        </div>
+        <div class="footer-center">
+            <div>&copy; 2025 Tender Monitoring System (Demo)</div>
+            <div>For Academic Use Only</div>
+        </div>
+        <div class="footer-right">Designed &amp; Developed by Team Project</div>
+    </footer>
+
+    <div id="viewModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="viewModalTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 id="viewModalTitle">Tender Details</h4>
+                <button type="button" class="modal-close" onclick="closeViewModal()">×</button>
+            </div>
+            <div id="viewBody" class="modal-body"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn" onclick="editFromView()"><i class="ph ph-pencil-simple"></i> Edit</button>
+                <button type="button" class="btn2" onclick="closeViewModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="stagesModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="stagesModalTitle">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h4 id="stagesModalTitle">Manage Stages</h4>
+                <button type="button" class="modal-close" onclick="closeStagesModal()">×</button>
+            </div>
+                <div class="modal-body">
+                    <p>Divide the project into stages for the contractor. The first stage will automatically be opened.</p>
+                    <div id="existingStages" style="margin-bottom: 20px;"></div>
+                    <div id="stageExtensionRequests" style="margin-bottom: 20px;"></div>
+                    <form id="addStageForm">
+                        <div class="form" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                            <div>
+                            <label>Stage Name *</label>
+                            <input type="text" id="newStageName" required placeholder="e.g. Foundation">
+                        </div>
+                        <div>
+                            <label>Deadline *</label>
+                            <input type="date" id="newStageDeadline" required>
+                        </div>
+                        <div>
+                            <label>Amount *</label>
+                            <input type="number" id="newStageAmount" min="0" step="0.01" required placeholder="0.00">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn" style="margin-top: 15px;">Add Stage</button>
+                </form>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn2" onclick="closeStagesModal()">Close</button>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="auth-session.js"></script>
+    <script src="live-date.js"></script>
+    <script src="performance-system.js"></script>
+    <script src="stage-workflow.js"></script>
+    <script>
+        const form=document.getElementById('projectForm'),msg=document.getElementById('message'),searchInput=document.getElementById('searchInput'),statusFilter=document.getElementById('statusFilter'),verificationFilter=document.getElementById('verificationFilter'),paymentFilter=document.getElementById('paymentFilter');
+        const TENDER_META_KEY='tenderMeta';
+        const APPLICATIONS_STORAGE_KEY='applications';
+        let projects=[],verifications=[],allStages=[],editingId=null,quick='all',performanceMetrics=[];
+        let currentStagesProjId=null,projectStages=[],stageExtensionRequests=[],useLocalExtensionRequests=false;
+        const STAGE_UPDATE_KEY='contractorStageUpdates';
+        const STAGE_META_KEY='contractorStageMeta';
+        const STAGE_EXTENSION_REQUESTS_KEY='stageExtensionRequests';
+        const REMOVED_CONTRACTOR_BLOCKS_KEY='removedContractorBlocks';
+
+        function warnIfFileProtocol(){
+            if(window.location.protocol==='file:'){
+                note('This page is opened with file://. Supabase requests may fail here. Run it with a local server like Live Server or localhost.','warn');
+            }
+        }
+        function loadUserInfo(){
+            const u=AuthSession.getCurrentUser();
+            if(!u){
+                if(window.location.protocol==='file:'){
+                    alert('Session not found in this tab.\n\nIf you opened this page using file:// or in a new browser tab, the login session may not be shared.\n\nRun the project on http://localhost (Live Server or node serve-localhost.js) and navigate from the dashboard.');
+                }
+                window.location.href='login.html';
+                return;
+            }
+            if(!AuthSession.hasRole(u,'Admin')){window.location.href='login.html';return}
+            document.getElementById('welcomeMsg').textContent=`Welcome, ${u.username}`;
+            document.getElementById('userRole').textContent=`Role: ${u.role}`;
+        }
+        function logout(){if(confirm('Are you sure you want to logout?')){AuthSession.clearCurrentUser();window.location.href='login.html'}}
+        function uuid(){if(window.crypto&&window.crypto.randomUUID){return window.crypto.randomUUID()}return'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16)})}
+        function note(t,k){msg.textContent=t;msg.className=`msg ${k}`;setTimeout(()=>msg.className='msg',3500)}
+        function showSec(id){document.querySelectorAll('.sec').forEach(s=>s.classList.toggle('active',s.id===id));document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.sec===id))}
+        function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+        function shortId(v){return !v?'-':(v.length>8?`${v.slice(0,8)}...`:v)}
+        function d(v){if(!v)return null;const x=new Date(v);if(Number.isNaN(x.getTime()))return null;x.setHours(0,0,0,0);return x}
+        function getTenderMeta(){try{return JSON.parse(localStorage.getItem(TENDER_META_KEY)||'{}')}catch{return {}}}
+        function setTenderMeta(meta){localStorage.setItem(TENDER_META_KEY,JSON.stringify(meta))}
+        function mergeTenderMeta(list){const meta=getTenderMeta();return list.map(item=>meta[item.proj_id]?{...item,...meta[item.proj_id]}:item)}
+        function vf(pid){return verifications.find(v=>v.proj_id===pid)||null}
+        function getStageMeta(){try{return JSON.parse(localStorage.getItem(STAGE_META_KEY)||'{}')}catch{return {}}}
+        function setStageMeta(items){localStorage.setItem(STAGE_META_KEY,JSON.stringify(items))}
+        function getLocalStages(){try{return JSON.parse(localStorage.getItem(STAGE_UPDATE_KEY)||'[]')}catch{return []}}
+        function setLocalStages(items){localStorage.setItem(STAGE_UPDATE_KEY,JSON.stringify(items))}
+        function getLocalExtensionRequests(){try{return JSON.parse(localStorage.getItem(STAGE_EXTENSION_REQUESTS_KEY)||'[]')}catch{return []}}
+        function setLocalExtensionRequests(items){localStorage.setItem(STAGE_EXTENSION_REQUESTS_KEY,JSON.stringify(items))}
+        function getLocalApplications(){try{return JSON.parse(localStorage.getItem(APPLICATIONS_STORAGE_KEY)||'[]')}catch{return []}}
+        function setLocalApplications(items){localStorage.setItem(APPLICATIONS_STORAGE_KEY,JSON.stringify(items))}
+        function getRemovedContractorBlocks(){try{return JSON.parse(localStorage.getItem(REMOVED_CONTRACTOR_BLOCKS_KEY)||'{}')}catch{return {}}}
+        function setRemovedContractorBlocks(items){localStorage.setItem(REMOVED_CONTRACTOR_BLOCKS_KEY,JSON.stringify(items))}
+        function normalizeIdentity(value){
+            return String(value??'').trim().toLowerCase();
+        }
+        function addRemovedContractorBlock(projId,project){
+            const projectId=String(projId??'').trim();
+            if(!projectId)return;
+            const invalid=new Set(['','not assigned','null','undefined']);
+            const identities=new Set();
+            const pushIdentity=value=>{
+                const normalized=normalizeIdentity(value);
+                if(!invalid.has(normalized)) identities.add(normalized);
+            };
+
+            pushIdentity(project?.assigned_contractor_id);
+            pushIdentity(project?.['Assigned officer']);
+
+            const projectApps=getLocalApplications().filter(app=>String(app?.tender_id)===projectId);
+            const assignedOfficer=normalizeIdentity(project?.['Assigned officer']);
+            const matchedApp=projectApps.find(app=>normalizeIdentity(app?.contractor_name)===assignedOfficer)
+                || projectApps.find(app=>String(app?.status)==='Accepted')
+                || projectApps[0];
+
+            if(matchedApp){
+                pushIdentity(matchedApp.contractor_user_id);
+                pushIdentity(matchedApp.contractor_id);
+                pushIdentity(matchedApp.contractor_name);
+            }
+
+            if(!identities.size)return;
+            const blocks=getRemovedContractorBlocks();
+            const existing=new Set((Array.isArray(blocks[projectId])?blocks[projectId]:[]).map(normalizeIdentity).filter(value=>!invalid.has(value)));
+            identities.forEach(value=>existing.add(value));
+            blocks[projectId]=[...existing];
+            setRemovedContractorBlocks(blocks);
+        }
+        async function archiveApplicationsForRepublish(projId){
+            const localApps=getLocalApplications().map(app=>{
+                if(String(app.tender_id)!==String(projId)) return app;
+                if(String(app.status)==='Archived' || String(app.status)==='Old') return app;
+                return {...app,status:'Archived'};
+            });
+            setLocalApplications(localApps);
+
+            let archiveRes=await supabaseClient.from('Applications').update({status:'Archived'}).eq('tender_id',projId).neq('status','Archived');
+            if(!archiveRes.error) return;
+            console.error(archiveRes.error);
+
+            const errTxt=[archiveRes.error?.message,archiveRes.error?.details,archiveRes.error?.hint].filter(Boolean).join(' ').toLowerCase();
+            if(errTxt.includes('check constraint') || errTxt.includes('violates')){
+                const oldRes=await supabaseClient.from('Applications').update({status:'Old'}).eq('tender_id',projId).neq('status','Old');
+                if(oldRes.error){
+                    console.error(oldRes.error);
+                    note('Project re-published, but database could not archive old applications. Local cycle reset still applied.','warn');
+                }
+            }else if(archiveRes.error?.code!=='42P01'){
+                note('Project re-published, but archiving previous applications failed in database.','warn');
+            }
+        }
+        function normalizeStageRecord(stage){
+            const meta=getStageMeta()[stage.stage_id]||{};
+            return {
+                stage_id: stage.stage_id,
+                proj_id: stage.proj_id,
+                full_proj_id: meta.full_proj_id || stage.proj_id,
+                contractor_id: stage.contractor_id ?? meta.contractor_id ?? '',
+                stage_name: meta.stage_name || stage.stage_name || 'Stage',
+                status: StageWorkflow.normalizeStatus(stage),
+                remarks: meta.remarks || stage.remarks || stage.Remarks || '',
+                date: meta.date || stage.date || stage['start date'] || '',
+                end_date: meta.end_date || stage['end date'] || stage.end_date || '',
+                stage_amount: meta.stage_amount ?? stage.stage_amount ?? '',
+                proof_image_url: meta.proof_image_url || meta.image_url || stage.proof_image_url || stage.image_url || '',
+                payment_status: meta.payment_status || stage.payment_status || 'Pending',
+                payment_date: meta.payment_date || stage.payment_date || '',
+                completion_date: meta.completion_date || stage.completion_date || ''
+            };
+        }
+        function stagesForProject(projId){
+            return StageWorkflow.resolveStages(allStages.filter(stage=>String(stage.full_proj_id||stage.proj_id)===String(projId)));
+        }
+        function effectiveProjectStatus(project){return StageWorkflow.deriveProjectStatus(project,stagesForProject(project.proj_id))}
+        function health(p){const st=effectiveProjectStatus(p),end=d(p['End Date']),today=d(new Date());if(st==='Closed')return'completed';if(end&&end<today)return'delayed';const soon=new Date(today);soon.setDate(today.getDate()+7);if(end&&end<=soon)return'risk';return'onTrack'}
+        function isUrgent(p){const end=d(p['End Date']),today=d(new Date());if(!end||end<today)return false;const diff=(end.getTime()-today.getTime())/(1000*60*60*24);return diff<=3 && diff>=0 && effectiveProjectStatus(p)!=='Closed' && p.health!=='delayed'}
+        function rowClass(h){if(h==='delayed')return'delay';if(h==='risk')return'risk';if(h==='completed')return'done';return''}
+        function stBadge(status,h){if(status==='Closed'||status==='Completed'||h==='completed')return'<span class="badge g">Closed</span>';if(h==='delayed')return'<span class="badge r">Delayed</span>';if(h==='risk')return`<span class="badge y">${esc(status||'At Risk')}</span>`;return`<span class="badge b">${esc(status||'On Track')}</span>`}
+        function vfBadge(s){if(s==='Approved')return'<span class="badge g">Approved</span>';if(s==='Rejected')return'<span class="badge r">Rejected</span>';if(s==='In Review'||s==='Hold')return`<span class="badge y">${esc(s)}</span>`;return`<span class="badge p">${esc(s||'Pending')}</span>`}
+        function payBadge(s){if(s==='Released')return'<span class="badge g">Released</span>';if(s==='Approved')return'<span class="badge b">Approved</span>';if(s==='Rejected')return'<span class="badge r">Rejected</span>';if(s==='Partial')return'<span class="badge y">Partial</span>';return'<span class="badge p">Pending</span>'}
+        function enrich(p){
+            const projectStages=stagesForProject(p.proj_id);
+            const totalStages=projectStages.length;
+            const verifiedStages=projectStages.filter(stage=>String(stage.status)==='Verified').length;
+            const paidStages=projectStages.filter(stage=>String(stage.payment_status)==='Released').length;
+            const verificationStatus=(totalStages>0 && verifiedStages===totalStages)?'Approved':'Pending';
+            const paymentStatus=(totalStages>0 && paidStages===totalStages)?'Released':'Pending';
+            const currentStage=StageWorkflow.currentStage(projectStages);
+            const derivedStatus=effectiveProjectStatus(p);
+            return {...p,Status:derivedStatus,verificationStatus,paymentStatus,currentStage,stageCounts:StageWorkflow.counts(projectStages),health:health({...p,Status:derivedStatus})};
+        }
+
+        async function loadAll(){
+            const [pr,vr,sr]=await Promise.all([supabaseClient.from('Project').select('*').order('Start Date',{ascending:false}),supabaseClient.from('Verification').select('*').order('Verific_no',{ascending:false}),supabaseClient.from('Stage Tracking').select('*')]);
+            if(pr.error){console.error(pr.error);note('Unable to load tenders.','err');return}
+            if(vr.error){console.error(vr.error);note('Unable to load verification records.','err');return}
+            projects=mergeTenderMeta(pr.data||[]);verifications=vr.data||[];
+            const dbStages=sr.error ? [] : (sr.data||[]).map(normalizeStageRecord);
+            const knownIds=new Set(dbStages.map(stage=>String(stage.stage_id)));
+            const localStages=getLocalStages().filter(stage=>!knownIds.has(String(stage.stage_id)));
+            allStages=[...dbStages,...localStages];
+            try{
+                const perf=await PerformanceSystem.loadPerformanceData(supabaseClient);
+                performanceMetrics=perf.metrics||[];
+            }catch(error){
+                console.error(error);
+                performanceMetrics=[];
+            }
+            render()
+        }
+
+        function render(){
+            const list=projects.map(enrich);
+            stats(list);recent(list);alerts(list);overdue(list);projectTable(list)
+        }
+
+        function stats(list){
+            const total=list.length,track=list.filter(p=>p.health==='onTrack').length,delay=list.filter(p=>p.health==='delayed').length,done=list.filter(p=>p.health==='completed').length,pending=list.filter(p=>p.verificationStatus==='Pending').length;
+            document.getElementById('stTotal').textContent=total;document.getElementById('stTrack').textContent=track;document.getElementById('stDelay').textContent=delay;document.getElementById('stDone').textContent=done;document.getElementById('stPending').textContent=pending
+        }
+
+        function recent(list){
+            const body=document.getElementById('recentBody'),items=[...list].sort((a,b)=>(d(b['Start Date'])||0)-(d(a['Start Date'])||0)).slice(0,6);
+            body.innerHTML=!items.length?'<tr><td colspan="6"><div class="empty">No tenders available yet.</div></td></tr>':items.map(p=>`<tr class="${rowClass(p.health)}"><td>${esc(p['Name']||'Untitled Tender')}</td><td>${esc(p['End Date']||'-')}</td><td>${stBadge(p['Status'],p.health)}</td><td>${vfBadge(p.verificationStatus)}</td><td>${payBadge(p.paymentStatus)}</td><td><button class="btn2 action-icon-btn" onclick="viewProject('${p.proj_id}')" title="View tender"><i class="ph ph-eye"></i></button></td></tr>`).join('')
+        }
+
+        function alerts(list){
+            const urgentProjects=list.filter(p=>isUrgent(p));
+            const urgentBody=document.getElementById('alNearBody');
+            const nearCard=document.getElementById('nearDeadlineCard');
+            if(!urgentProjects.length){
+                urgentBody.innerHTML='';
+                if(nearCard) nearCard.style.display='none';
+            } else {
+                urgentBody.innerHTML=urgentProjects.slice(0,5).map(p=>{
+                    const daysLeft=Math.ceil((d(p['End Date']).getTime()-d(new Date()).getTime())/(1000*60*60*24));
+                    return `<div class="urgent-item"><div class="urgent-main"><div class="urgent-title">${esc(p['Name']||'Untitled Tender')}</div><div class="urgent-sub">Contractor: ${esc(p['Assigned officer']||'Not Assigned')}</div><div class="urgent-deadline">Deadline in ${daysLeft} day${daysLeft===1?'':'s'}</div></div><div class="urgent-meta"><i class="ph ph-calendar-dots"></i><span>${esc(p['End Date']||'-')}</span></div></div>`;
+                }).join('');
+                if(nearCard) nearCard.style.display='block';
+            }
+        }
+
+        function overdue(list){
+            const box=document.getElementById('overBody'),items=list.filter(p=>p.health==='delayed').sort((a,b)=>(d(a['End Date'])||0)-(d(b['End Date'])||0)).slice(0,5);
+            box.innerHTML=items.length?items.map(p=>`<div class="overitem"><strong>${esc(p['Name']||'Untitled Tender')}</strong><small>Deadline: ${esc(p['End Date']||'-')} | Contractor: ${esc(p['Assigned officer']||'Not Assigned')}</small></div>`).join(''):'<div class="empty">No overdue tenders.</div>';
+        }
+
+        function matchQuick(p){if(quick==='delayed')return p.health==='delayed';if(quick==='missedDeadline')return p.health==='delayed';if(quick==='pendingVerification')return p.verificationStatus==='Pending';return true}
+        function filtered(list){
+            const q=searchInput.value.trim().toLowerCase(),sf=statusFilter.value,vf=verificationFilter.value,pf=paymentFilter.value;
+            return list.filter(p=>{
+                const ms=!q||(p['Name']||'').toLowerCase().includes(q)||(p.proj_id||'').toLowerCase().includes(q)||(p['Assigned officer']||'').toLowerCase().includes(q);
+                const ss=sf==='all'||p['Status']===sf,vs=vf==='all'||p.verificationStatus===vf,ps=pf==='all'||p.paymentStatus===pf;
+                const activeProject=String(p['Status']||'').toLowerCase()!=='closed';
+                return activeProject&&ms&&ss&&vs&&ps&&matchQuick(p)
+            })
+        }
+
+        function projectTable(list){
+            const body=document.getElementById('projectBody'),items=filtered(list);
+            if(!items.length){body.innerHTML='<tr><td colspan="8"><div class="empty">No tenders match the current filters.</div></td></tr>';return}
+            body.innerHTML=items.map(p=>{const can=stagesForProject(p.proj_id).some(stage=>stage.status==='Verified'&&stage.payment_status!=='Released');const hasContractor=(p['Assigned officer']&&p['Assigned officer']!=='Not Assigned')||p.assigned_contractor_id;return`<tr class="${rowClass(p.health)}"><td>${esc(shortId(p.proj_id))}</td><td>${esc(p['Name']||'Untitled Tender')}</td><td>${esc(p['End Date']||'-')}</td><td>${stBadge(p['Status'],p.health)}</td><td>${vfBadge(p.verificationStatus)}</td><td>${payBadge(p.paymentStatus)}</td><td>${esc(p['Assigned officer']||'Not Assigned')}</td><td><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn2" style="padding:6px 12px;font-size:13px;" onclick="viewProject('${p.proj_id}')"><i class="ph ph-eye"></i> View</button><button class="btn2" style="padding:6px 12px;font-size:13px;" onclick="openStagesModal('${p.proj_id}')" ${hasContractor?'':'disabled'} title="${hasContractor?'Manage stages and release stage-wise payment':'Assign contractor first'}"><i class="ph ph-list-numbers"></i> Stages</button><button class="btn2" style="padding:6px 12px;font-size:13px;color:var(--warning-text);" onclick="removeAssignedContractor('${p.proj_id}')" ${hasContractor?'':'disabled'} title="${hasContractor?'Remove contractor and re-publish tender':'No contractor assigned'}"><i class="ph ph-arrow-counter-clockwise"></i> Remove Contractor</button><button class="btn2" style="padding:6px 12px;font-size:13px;color:var(--danger);" onclick="deleteProject('${p.proj_id}')"><i class="ph ph-trash"></i> Delete</button><button class="btn2" style="padding:6px 12px;font-size:13px;${can?'color:var(--success);':''}" onclick="openStagesModal('${p.proj_id}')" ${can?'':'disabled'}>${can?'<i class="ph ph-money"></i> Release Stage Payment':'<i class="ph ph-lock-key"></i> Locked'}</button></div></td></tr>`}).join('');
+        }
+
+        function quickFilter(type){
+            quick=type;
+            showSec('projects');
+            projectTable(projects.map(enrich));
+        }
+        function resetFilters(){searchInput.value='';statusFilter.value='all';verificationFilter.value='all';paymentFilter.value='all';quick='all';projectTable(projects.map(enrich))}
+        function resetFiltersAndShow(){resetFilters();showSec('projects')}
+
+        function viewProject(id){
+            const p=projects.find(x=>x.proj_id===id);if(!p)return;
+            const details=enrich(p);
+            const stageRows=stagesForProject(id);
+            document.getElementById('viewBody').innerHTML=`<div><strong>Tender Title</strong><div>${esc(details['Name']||'Untitled Tender')}</div></div><div><strong>Deadline</strong><div>${esc(details['End Date']||'-')}</div></div><div><strong>Status</strong><div>${stBadge(details['Status'],details.health)}</div></div><div><strong>Verification</strong><div>${vfBadge(details.verificationStatus)}</div></div><div><strong>Payment</strong><div>${payBadge(details.paymentStatus)}</div></div><div><strong>Contractor</strong><div>${esc(details['Assigned officer']||'Not Assigned')}</div></div><div><strong>Location</strong><div>${esc(details['Location']||'-')}</div></div><div><strong>Pincode</strong><div>${esc(details['Pincode']||'-')}</div></div><div><strong>Description</strong><div>${esc(details['Description']||'No description')}</div></div><div style="margin-top:16px;"><strong>Total Stages</strong><div>${stageRows.length}</div></div><div style="margin-top:12px;display:grid;gap:10px;">${stageRows.length?stageRows.map(stage=>`<div style="padding:12px;border:1px solid #e2e8f0;border-radius:12px;"><strong>${esc(stage.stage_name)}</strong><div style="font-size:13px;color:#64748b;">Deadline: ${esc(stage.end_date||'-')} | Amount: ${esc(stage.stage_amount||'-')} | Status: ${esc(stage.displayStatus||stage.status)}</div><div style="font-size:13px;color:#64748b;">Proof: ${stage.proof_image_url?'Uploaded':'Not uploaded'} | Payment: ${esc(stage.payment_status||'Pending')}${stage.payment_date?` on ${esc(stage.payment_date)}`:''}</div></div>`).join(''):'<div class="empty">No stages configured yet.</div>'}</div>`;
+            document.getElementById('viewModal').dataset.projId=id;document.getElementById('viewModal').classList.add('open');
+        }
+        function closeViewModal(){document.getElementById('viewModal').classList.remove('open');}
+        function editFromView(){const id=document.getElementById('viewModal').dataset.projId;closeViewModal();editProject(id)}
+        function editProject(id){
+            const p=projects.find(x=>x.proj_id===id);if(!p)return;
+            document.getElementById('projName').value=p['Name']||'';document.getElementById('description').value=p['Description']||'';document.getElementById('endDate').value=p['End Date']||'';document.getElementById('budget').value=p['Budget']||'';document.getElementById('location').value=p['Location']||'';document.getElementById('pincode').value=p['Pincode']||'';editingId=id;document.getElementById('saveBtn').textContent='Update Tender';showSec('add');window.scrollTo({top:0,behavior:'smooth'})
+        }
+
+        async function deleteProject(id){
+            if(!confirm('Are you sure you want to delete this tender?'))return;
+            const v=vf(id);
+            if(v){const vd=await supabaseClient.from('Verification').delete().eq('Verific_no',Number(v['Verific_no']));if(vd.error){console.error(vd.error);note('Unable to remove verification record.','err');return}}
+            const pd=await supabaseClient.from('Project').delete().eq('proj_id',id);if(pd.error){console.error(pd.error);note('Failed to delete tender.','err');return}
+            note('Tender deleted successfully.','ok');await loadAll()
+        }
+
+        async function releasePayment(stageId){
+            const stage=stagesForProject(currentStagesProjId||'').find(item=>String(item.stage_id)===String(stageId)) || allStages.find(item=>String(item.stage_id)===String(stageId));
+            if(!stage){note('Stage not found for payment release.','err');return}
+            if(stage.status!=='Verified'){note('Payment can be released only for verified stages.','err');return}
+            const paymentDate=new Date().toISOString().split('T')[0];
+            let stageUpdate=await supabaseClient.from('Stage Tracking').update({status:'Paid',payment_status:'Released',payment_date:paymentDate}).eq('stage_id',stageId);
+            if(stageUpdate.error){
+                stageUpdate=await supabaseClient.from('Stage Tracking').update({status:'Paid'}).eq('stage_id',stageId);
+            }
+            if(stageUpdate.error){console.error(stageUpdate.error);note(`Failed to release stage payment: ${stageUpdate.error.message}`,'err');return}
+            const verifyRecord=verifications.find(item=>String(item.stage_id)===String(stageId));
+            if(verifyRecord?.['Verific_no']){
+                const verifyUpdate=await supabaseClient.from('Verification').update({Payment_Approval:'Released'}).eq('Verific_no',Number(verifyRecord['Verific_no']));
+                if(verifyUpdate.error) console.error(verifyUpdate.error);
+            }
+            const stageMeta=getStageMeta();
+            stageMeta[stageId]={...(stageMeta[stageId]||{}),payment_status:'Released',payment_date:paymentDate};
+            setStageMeta(stageMeta);
+            setLocalStages(getLocalStages().map(item=>String(item.stage_id)===String(stageId)?{...item,status:'Paid',payment_status:'Released',payment_date:paymentDate}:item));
+            const projectedStages=allStages.map(item=>String(item.stage_id)===String(stageId)?{...item,status:'Paid',payment_status:'Released',payment_date:paymentDate}:item);
+            const projectId=stage.full_proj_id||stage.proj_id;
+            const projectStages=StageWorkflow.resolveStages(projectedStages.filter(item=>String(item.full_proj_id||item.proj_id)===String(projectId)));
+            if(StageWorkflow.deriveProjectStatus({Status:'Open'},projectStages)==='Closed'){
+                const projectUpdate=await supabaseClient.from('Project').update({Status:'Closed'}).eq('proj_id',projectId);
+                if(projectUpdate.error) console.error(projectUpdate.error);
+            }
+            note('Stage payment released successfully.','ok');
+            if(currentStagesProjId) await loadStagesForProject(currentStagesProjId);
+            await loadAll()
+        }
+
+        async function approveVerification(id){
+            const v=vf(id);if(!v){note('No verification record found.','err');return}
+            const r=await supabaseClient.from('Verification').update({'Verification Satus':'Approved',Payment_Approval:'Approved'}).eq('Verific_no',Number(v['Verific_no']));
+            if(r.error){console.error(r.error);note('Failed to approve verification.','err');return}
+            note('Verification approved.','ok');closePendingModal();await loadAll()
+        }
+
+        async function rejectVerification(id){
+            const v=vf(id);if(!v){note('No verification record found.','err');return}
+            const r=await supabaseClient.from('Verification').update({'Verification Satus':'Rejected',Payment_Approval:'Rejected'}).eq('Verific_no',Number(v['Verific_no']));
+            if(r.error){console.error(r.error);note('Failed to reject verification.','err');return}
+            note('Verification rejected.','ok');closePendingModal();await loadAll()
+        }
+
+        async function openStagesModal(projId){
+            currentStagesProjId=projId;
+            document.getElementById('existingStages').innerHTML='<p>Loading stages...</p>';
+            document.getElementById('stagesModal').classList.add('open');
+            await loadStagesForProject(projId);
+        }
+
+        function closeStagesModal(){
+            document.getElementById('stagesModal').classList.remove('open');
+            document.getElementById('addStageForm').reset();
+            currentStagesProjId=null;
+        }
+
+        async function loadStagesForProject(projId){
+            const stRes=await supabaseClient.from('Stage Tracking').select('*');
+            const extRes=await supabaseClient.from('StageExtensionRequests').select('*').eq('proj_id',projId).order('requested_date',{ascending:false});
+            if(stRes.error){
+                console.error(stRes.error);
+                projectStages=getLocalStages().filter(s=>(s.full_proj_id||s.proj_id)===projId);
+            }else{
+                const dbStages=(stRes.data||[]).map(normalizeStageRecord);
+                const localStages=getLocalStages();
+                const ids=new Set(dbStages.map(item=>item.stage_id));
+                const allStages=[...localStages.filter(item=>!ids.has(item.stage_id)),...dbStages];
+                projectStages=allStages.filter(s=>(s.full_proj_id||s.proj_id)===projId);
+            }
+            if(extRes.error){
+                console.error(extRes.error);
+                useLocalExtensionRequests=true;
+                stageExtensionRequests=getLocalExtensionRequests().filter(item=>String(item.proj_id)===String(projId));
+            }else{
+                useLocalExtensionRequests=false;
+                stageExtensionRequests=extRes.data||[];
+                const allLocal=getLocalExtensionRequests().filter(item=>String(item.proj_id)!==String(projId));
+                setLocalExtensionRequests([...allLocal,...stageExtensionRequests]);
+            }
+            projectStages=StageWorkflow.resolveStages(projectStages);
+            renderStagesList();
+            renderExtensionRequests();
+        }
+
+        function renderStagesList(){
+            const box=document.getElementById('existingStages');
+            const addForm=document.getElementById('addStageForm');
+            if(!projectStages.length){
+                box.innerHTML='<div class="empty">No stages configured yet.</div>';
+                addForm.style.display='block';
+                return;
+            }
+            addForm.style.display='none';
+            box.innerHTML=`<table style="width:100%"><thead><tr><th>Stage Name</th><th>Deadline</th><th>Amount</th><th>Status</th><th>Proof</th><th>Payment</th><th>Action</th></tr></thead><tbody>`+
+                projectStages.map(s=>`<tr><td>${esc(s.stage_name)}</td><td>${esc(s.end_date||s.date||'-')}</td><td>${esc(s.stage_amount||'-')}</td><td><span class="badge ${s.displayStatus==='Paid'?'g':s.displayStatus==='Verified'?'b':s.displayStatus==='Completed'?'y':s.displayStatus==='Rejected'?'r':'p'}">${esc(s.displayStatus||s.status)}</span></td><td>${s.proof_image_url?'<span class="badge b">Uploaded</span>':'-'}</td><td>${payBadge(s.payment_status||'Pending')}${s.payment_date?`<div style="font-size:12px;color:#64748b;">${esc(s.payment_date)}</div>`:''}</td><td><button type="button" class="btn2" style="padding:6px 12px;font-size:13px;${s.status==='Verified'&&s.payment_status!=='Released'?'color:var(--success);':''}" onclick="releasePayment('${esc(s.stage_id)}')" ${s.status==='Verified'&&s.payment_status!=='Released'?'':'disabled'}>${s.payment_status==='Released'?'<i class="ph ph-check-circle"></i> Released':'<i class="ph ph-money"></i> Release'}</button></td></tr>`).join('')+
+                `</tbody></table><div class="msg warn" style="display:block;margin-top:12px;">Stages are locked after creation. Admin can release payment only after verification. The next stage unlocks after the previous stage payment is released.</div>`;
+        }
+
+        function requestStatusBadge(status){
+            if(status==='Approved')return '<span class="badge g">Approved</span>';
+            if(status==='Rejected')return '<span class="badge r">Rejected</span>';
+            return '<span class="badge y">Pending</span>';
+        }
+
+        function renderExtensionRequests(){
+            const box=document.getElementById('stageExtensionRequests');
+            if(!stageExtensionRequests.length){
+                box.innerHTML='<div class="empty">No stage extension requests yet.</div>';
+                return;
+            }
+            box.innerHTML=`<div style="margin-bottom:10px;"><strong>Extension Requests</strong><p style="color:var(--text-muted);font-size:13px;">Review contractor deadline extension requests for this tender.</p></div><table style="width:100%"><thead><tr><th>Stage</th><th>Days</th><th>Reason</th><th>Requested</th><th>Status</th><th>Action</th></tr></thead><tbody>`+
+                stageExtensionRequests.map(req=>{
+                    const stage=projectStages.find(item=>String(item.stage_id)===String(req.stage_id));
+                    const pending=req.status==='Pending';
+                    return `<tr><td>${esc(stage?.stage_name||req.stage_id||'-')}</td><td>${esc(req.requested_days)}</td><td>${esc(req.reason||'-')}</td><td>${esc(req.requested_date||'-')}</td><td>${requestStatusBadge(req.status)}</td><td><div style="display:flex;gap:8px;"><button class="btn2" style="padding:6px 12px;font-size:13px;color:var(--success);" onclick="reviewExtensionRequest('${req.request_id}','Approved')" ${pending?'':'disabled'}><i class="ph ph-check-circle"></i> Approve</button><button class="btn2" style="padding:6px 12px;font-size:13px;color:var(--danger);" onclick="reviewExtensionRequest('${req.request_id}','Rejected')" ${pending?'':'disabled'}><i class="ph ph-x-circle"></i> Reject</button></div></td></tr>`;
+                }).join('')+
+                `</tbody></table>`;
+        }
+
+        document.getElementById('addStageForm').addEventListener('submit', async(e)=>{
+            e.preventDefault();
+            if(!currentStagesProjId)return;
+            const name=document.getElementById('newStageName').value.trim();
+            const endD=document.getElementById('newStageDeadline').value;
+            const amount=document.getElementById('newStageAmount').value;
+            if(!name||!endD||amount==='')return;
+            
+            const btn=e.target.querySelector('button');
+            btn.textContent='Adding...';
+            btn.disabled=true;
+
+            const existingProject=projects.find(x=>x.proj_id===currentStagesProjId);
+            const stageId=uuid();
+            const status='Not Started';
+
+            const payload={
+                stage_id:stageId,
+                proj_id:currentStagesProjId,
+                full_proj_id:currentStagesProjId,
+                contractor_id:existingProject?.assigned_contractor_id||existingProject?.['Assigned officer']||'',
+                stage_name:name,
+                status:status,
+                remarks:'',
+                date:new Date().toISOString().split('T')[0],
+                end_date:endD,
+                stage_amount:amount,
+                payment_status:'Pending',
+                payment_date:'',
+                proof_image_url:''
+            };
+            const metaPayload={stage_name:name,remarks:'',date:new Date().toISOString().split('T')[0],full_proj_id:currentStagesProjId,tender_name:existingProject?.['Name']||'Tender',contractor_id:existingProject?.assigned_contractor_id||existingProject?.['Assigned officer']||'',end_date:endD,stage_amount:amount,payment_status:'Pending',payment_date:'',proof_image_url:''};
+            const dbPayload={
+                stage_id:stageId,
+                proj_id:currentStagesProjId,
+                contractor_id:existingProject?.assigned_contractor_id||existingProject?.['Assigned officer']||'',
+                stage_name:name,
+                status:status,
+                remarks:'',
+                date:new Date().toISOString().split('T')[0],
+                'start date':new Date().toISOString().split('T')[0],
+                'end date':endD,
+                stage_amount:Number(amount),
+                payment_status:'Pending',
+                payment_date:null
+            };
+
+            try{
+                const stageMeta=getStageMeta();
+                stageMeta[stageId]=metaPayload;
+                setStageMeta(stageMeta);
+                let response=await supabaseClient.from('Stage Tracking').insert([dbPayload]);
+                if(response.error){
+                    response=await supabaseClient.from('Stage Tracking').insert([{
+                        stage_id:stageId,
+                        proj_id:currentStagesProjId,
+                        stage_name:name,
+                        status:status,
+                        remarks:'',
+                        date:new Date().toISOString().split('T')[0],
+                        'start date':new Date().toISOString().split('T')[0],
+                        'end date':endD
+                    }]);
+                }
+                
+                // Add to local state synchronously
+                const updatedStages=getLocalStages().filter(item=>item.stage_id!==stageId);
+                updatedStages.unshift(payload);
+                setLocalStages(updatedStages);
+
+                if(!response.error){
+                    note('Stage added successfully','ok');
+                }else{
+                    console.error(response.error);
+                    note(`Stage saved locally. Database save failed: ${response.error.message}`,'warn');
+                }
+                
+                document.getElementById('addStageForm').reset();
+                await loadStagesForProject(currentStagesProjId);
+            }catch(error){
+                console.error(error);
+                note(`Unable to save stage: ${error.message}`,'err');
+            }finally{
+                btn.textContent='Add Stage';
+                btn.disabled=false;
+            }
+        });
+
+        function addDaysToDate(dateValue,days){
+            const base=new Date(dateValue);
+            if(Number.isNaN(base.getTime()))return null;
+            base.setDate(base.getDate()+Number(days||0));
+            return base.toISOString().split('T')[0];
+        }
+
+        async function reviewExtensionRequest(requestId,nextStatus){
+            const req=stageExtensionRequests.find(item=>String(item.request_id)===String(requestId));
+            if(!req)return;
+            if(nextStatus==='Approved'){
+                const stage=projectStages.find(item=>String(item.stage_id)===String(req.stage_id));
+                if(!stage){note('Unable to find the stage for this request.','err');return}
+                const currentDeadline=stage.end_date||stage['end date'];
+                const newDeadline=addDaysToDate(currentDeadline,req.requested_days);
+                if(!newDeadline){note('Unable to calculate new deadline.','err');return}
+
+                let stageUpdate=await supabaseClient.from('Stage Tracking').update({'end date':newDeadline}).eq('stage_id',req.stage_id);
+                if(stageUpdate.error){
+                    stageUpdate=await supabaseClient.from('Stage Tracking').update({end_date:newDeadline}).eq('stage_id',req.stage_id);
+                }
+                if(stageUpdate.error){
+                    console.error(stageUpdate.error);
+                    note(`Failed to update stage deadline: ${stageUpdate.error.message}`,'err');
+                    return;
+                }
+
+                const stageMeta=getStageMeta();
+                stageMeta[req.stage_id]={...(stageMeta[req.stage_id]||{}),end_date:newDeadline};
+                setStageMeta(stageMeta);
+                setLocalStages(getLocalStages().map(item=>String(item.stage_id)===String(req.stage_id)?{...item,end_date:newDeadline}:item));
+            }
+
+            if(useLocalExtensionRequests){
+                const updated=getLocalExtensionRequests().map(item=>String(item.request_id)===String(requestId)?{...item,status:nextStatus}:item);
+                setLocalExtensionRequests(updated);
+            }else{
+                const updateRes=await supabaseClient.from('StageExtensionRequests').update({status:nextStatus}).eq('request_id',requestId);
+                if(updateRes.error){
+                    console.error(updateRes.error);
+                    note(`Failed to ${nextStatus.toLowerCase()} extension request.`,'err');
+                    return;
+                }
+                const merged=getLocalExtensionRequests().map(item=>String(item.request_id)===String(requestId)?{...item,status:nextStatus}:item);
+                setLocalExtensionRequests(merged);
+            }
+
+            note(`Extension request ${nextStatus.toLowerCase()} successfully.`,'ok');
+            await loadStagesForProject(currentStagesProjId);
+        }
+
+        async function removeAssignedContractor(projId){
+            const project=projects.find(item=>String(item.proj_id)===String(projId));
+            if(!project)return;
+            if(!confirm('Remove the assigned contractor and re-publish this tender? Existing stage data will be preserved.'))return;
+
+            let projectUpdate=await supabaseClient.from('Project').update({assigned_contractor_id:null,'Assigned officer':'Not Assigned',Status:'Open'}).eq('proj_id',projId);
+            if(projectUpdate.error){
+                projectUpdate=await supabaseClient.from('Project').update({'Assigned officer':'Not Assigned',Status:'Open'}).eq('proj_id',projId);
+            }
+            if(projectUpdate.error){
+                projectUpdate=await supabaseClient.from('Project').update({'Assigned officer':'Not Assigned'}).eq('proj_id',projId);
+            }
+            if(projectUpdate.error){
+                console.error(projectUpdate.error);
+                note(`Failed to remove contractor: ${projectUpdate.error.message}`,'err');
+                return;
+            }
+
+            addRemovedContractorBlock(projId,project);
+            const tenderMeta=getTenderMeta();
+            tenderMeta[projId]={...(tenderMeta[projId]||{}),'Assigned officer':'Not Assigned',assigned_contractor_id:'',Status:'Open',republished:true};
+            setTenderMeta(tenderMeta);
+            await archiveApplicationsForRepublish(projId);
+            note('Contractor removed and tender re-published successfully. All stage data is preserved.','ok');
+            await loadAll();
+        }
+
+        function clearForm(){editingId=null;document.getElementById('saveBtn').textContent='Publish Tender'}
+        function cancelProject(){form.reset();clearForm();showSec('projects')}
+        function nextSchemaFallback(record,error){
+            const errorText=[error?.message,error?.details,error?.hint].filter(Boolean).join(' ');
+            const match=errorText.match(/Could not find the ['"]?([^'".]+)['"]? column/i);
+            if(!match)return null;
+            const missingColumn=match[1];
+            if(!(missingColumn in record))return null;
+            const fallbackRecord={...record};
+            delete fallbackRecord[missingColumn];
+            return {fallbackRecord,missingColumn};
+        }
+        function lengthFallback(record){
+            const removable=['Pincode','Location','Description','Assigned officer','Created Date','Budget'];
+            const key=removable.find(column=>column in record);
+            if(!key)return null;
+            const fallbackRecord={...record};
+            delete fallbackRecord[key];
+            return {fallbackRecord,missingColumn:key};
+        }
+        async function insertProjectRecord(record){
+            let currentRecord={...record};
+            let removedColumns=[];
+            for(let attempt=0;attempt<8;attempt++){
+                const response=await supabaseClient.from('Project').insert([currentRecord]);
+                if(!response.error){
+                    if(removedColumns.length){
+                        console.warn(`Tender created without unsupported columns: ${removedColumns.join(', ')}`);
+                    }
+                    return response;
+                }
+                const errStr=[response.error?.message,response.error?.details,response.error?.hint].filter(Boolean).join(' ').toLowerCase();
+                let fallback=null;
+                if(errStr.includes('project_status_check') && 'Status' in currentRecord){
+                    const fallbackRecord={...currentRecord};
+                    delete fallbackRecord['Status'];
+                    fallback={fallbackRecord, missingColumn:'Status (due to constraint)'};
+                } else {
+                    fallback=nextSchemaFallback(currentRecord,response.error)||(errStr.includes('value too long for type character varying')?lengthFallback(currentRecord):null);
+                }
+                if(!fallback)return response;
+                currentRecord=fallback.fallbackRecord;
+                removedColumns.push(fallback.missingColumn);
+            }
+            return { error: { message: 'Unable to save tender because the Project table is missing multiple required columns.' } };
+        }
+        async function updateProjectRecord(id,record){
+            let currentRecord={...record};
+            let removedColumns=[];
+            for(let attempt=0;attempt<8;attempt++){
+                const response=await supabaseClient.from('Project').update(currentRecord).eq('proj_id',id);
+                if(!response.error){
+                    if(removedColumns.length){
+                        console.warn(`Tender updated without unsupported columns: ${removedColumns.join(', ')}`);
+                    }
+                    return response;
+                }
+                const errStr=[response.error?.message,response.error?.details,response.error?.hint].filter(Boolean).join(' ').toLowerCase();
+                let fallback=null;
+                if(errStr.includes('project_status_check') && 'Status' in currentRecord){
+                    const fallbackRecord={...currentRecord};
+                    delete fallbackRecord['Status'];
+                    fallback={fallbackRecord, missingColumn:'Status (due to constraint)'};
+                } else {
+                    fallback=nextSchemaFallback(currentRecord,response.error)||(errStr.includes('value too long for type character varying')?lengthFallback(currentRecord):null);
+                }
+                if(!fallback)return response;
+                currentRecord=fallback.fallbackRecord;
+                removedColumns.push(fallback.missingColumn);
+            }
+            return { error: { message: 'Unable to update tender because the Project table is missing multiple required columns.' } };
+        }
+        form.addEventListener('reset',()=>setTimeout(clearForm,0));
+
+        form.addEventListener('submit',async e=>{
+            e.preventDefault();
+            const projId=editingId||uuid(),projName=document.getElementById('projName').value.trim(),description=document.getElementById('description').value.trim(),endDate=document.getElementById('endDate').value,budgetValue=parseFloat(document.getElementById('budget').value),location=document.getElementById('location').value.trim(),pincode=document.getElementById('pincode').value.trim(),today=d(new Date()),deadlineDate=d(endDate),createdDate=new Date().toISOString().split('T')[0],status='Open',assignedOfficer='Not Assigned';
+            if(!projName||!endDate||!location||!pincode){note('Please fill in all required tender fields.','err');return}
+            if(Number.isNaN(budgetValue)||budgetValue<=0){note('Budget must be a positive number.','err');return}
+            if(!deadlineDate||deadlineDate<=today){note('Deadline must be after the current date.','err');return}
+            if(!/^\d{6}$/.test(pincode)){note('Pincode must be 6 digits.','err');return}
+            const existingProject=projects.find(x=>x.proj_id===editingId);
+            const dbPayload={
+                'Name':projName,
+                'Description':description,
+                'Location':location,
+                'Pincode':pincode,
+                'Budget':budgetValue,
+                'Created Date':existingProject?.['Created Date']||createdDate,
+                'Assigned officer':existingProject?.['Assigned officer']||assignedOfficer,
+                'Start Date':existingProject?.['Start Date']||createdDate,
+                'End Date':endDate,
+                'Status':existingProject?.['Status']||status
+            };
+            const tenderMeta={Description:description,Location:location,Pincode:pincode,Budget:budgetValue,'Created Date':existingProject?.['Created Date']||createdDate,'Assigned officer':existingProject?.['Assigned officer']||assignedOfficer};
+
+            if(editingId){
+                const up=await updateProjectRecord(editingId,dbPayload);
+                if(up.error){console.error(up.error);note('Failed to update tender.','err');return}
+                const meta=getTenderMeta();meta[editingId]={...(meta[editingId]||{}),...tenderMeta};setTenderMeta(meta);
+                note('Tender updated successfully.','ok');
+            }else{
+                const pi=await insertProjectRecord({proj_id:projId,...dbPayload});
+                if(pi.error){console.error(pi.error);note(`Failed to save tender: ${esc(pi.error.message||pi.error.details||'Unknown error')}`,'err');return}
+                const meta=getTenderMeta();meta[projId]=tenderMeta;setTenderMeta(meta);
+                note('Tender published successfully','ok');
+            }
+
+            form.reset();clearForm();showSec('projects');await loadAll()
+        });
+
+        document.querySelectorAll('.navbtn').forEach(b=>b.addEventListener('click',()=>showSec(b.dataset.sec)));
+        [searchInput,statusFilter,verificationFilter,paymentFilter].forEach(x=>{x.addEventListener('input',()=>projectTable(projects.map(enrich)));x.addEventListener('change',()=>projectTable(projects.map(enrich)))});
+        window.addEventListener('DOMContentLoaded',async()=>{
+            warnIfFileProtocol();loadUserInfo();
+            const initialSection=window.location.hash.replace('#','');
+            if(['dash','projects','add'].includes(initialSection))showSec(initialSection);
+            try{
+                const perf=await PerformanceSystem.syncContractorPerformance(supabaseClient,{persist:true});
+                performanceMetrics=perf.metrics||[];
+            }catch(error){
+                console.error(error);
+                note(`Performance sync unavailable. Run ${PerformanceSystem.getSetupSqlPath()} if needed.`,'warn');
+            }
+            await loadAll();
+            // Auto-refresh every 15 seconds to keep dashboard live
+            setInterval(loadAll, 15000);
+            // Supabase Realtime: instant refresh on DB changes
+            try {
+                supabaseClient.channel('admin-realtime')
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Project'},()=>loadAll())
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Verification'},()=>loadAll())
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Stage Tracking'},()=>loadAll())
+                    .on('postgres_changes',{event:'*',schema:'public',table:'StageExtensionRequests'},()=>currentStagesProjId?loadStagesForProject(currentStagesProjId):loadAll())
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Applications'},()=>loadAll())
+                    .subscribe();
+            } catch(e){ console.warn('Realtime subscription not available, using polling only.',e); }
+        });
+        window.reviewExtensionRequest=reviewExtensionRequest;
+        window.removeAssignedContractor=removeAssignedContractor;
+    </script>
+</body>
+</html>

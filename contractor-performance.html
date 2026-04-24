@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contractor Performance | Public Works Monitoring System</title>
+    <link rel="stylesheet" href="dashboard.css">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div class="app">
+        <aside class="side">
+            <div>
+                <h1>Public Works Portal</h1>
+            </div>
+            <div class="nav">
+                <button class="navbtn" type="button" onclick="window.location.href='project-management.html'"><i class="ph ph-squares-four"></i> Dashboard</button>
+                <button class="navbtn" type="button" onclick="window.location.href='project-management.html#projects'"><i class="ph ph-files"></i> Tenders</button>
+                <button class="navbtn" type="button" onclick="window.location.href='project-management.html#add'"><i class="ph ph-plus-circle"></i> Publish Tender</button>
+                <button class="navbtn" type="button" onclick="window.location.href='applications.html'"><i class="ph ph-check-circle"></i> Applications</button>
+                <button class="navbtn active" type="button" onclick="window.location.href='contractor-performance.html'"><i class="ph ph-chart-line-up"></i> Contractor Performance</button>
+                <button class="navbtn" type="button" onclick="window.location.href='history.html'"><i class="ph ph-archive-box"></i> History</button>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="top">
+                <div>
+                    <h2>Contractor Performance</h2>
+                    <p>Monitor contractor performance and blacklist status</p>
+                </div>
+                <div class="topr">
+                    <div class="user"><strong id="welcomeMsg">Welcome, Admin</strong><small id="userRole">Role: Admin</small></div>
+                    <button class="logout" onclick="logout()"><i class="ph ph-sign-out"></i> Logout</button>
+                </div>
+            </div>
+
+            <div id="message" class="msg"></div>
+
+            <section class="sec active">
+                <div class="head"><h3>All Contractors</h3><p>View contractor performance metrics, missed deadlines, and manage blacklist status.</p></div>
+                
+                <div class="stats">
+                    <div class="stat"><i class="ph-duotone ph-users" style="font-size: 32px; color: var(--primary); margin-bottom: 8px;"></i><small>Total Contractors</small><strong id="stTotalContractors">0</strong></div>
+                    <div class="stat"><i class="ph-duotone ph-check-circle" style="font-size: 32px; color: var(--success); margin-bottom: 8px;"></i><small>Active</small><strong id="stActive">0</strong></div>
+                    <div class="stat"><i class="ph-duotone ph-prohibit" style="font-size: 32px; color: var(--danger); margin-bottom: 8px;"></i><small>Blacklisted</small><strong id="stBlacklisted">0</strong></div>
+                    <div class="stat"><i class="ph-duotone ph-warning" style="font-size: 32px; color: var(--warning); margin-bottom: 8px;"></i><small>Low Performance</small><strong id="stLowPerf">0</strong></div>
+                </div>
+
+                <div class="card">
+                    <div class="toolbar">
+                        <input id="searchInput" type="text" placeholder="Search by name or email">
+                        <select id="statusFilter">
+                            <option value="all">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="blacklisted">Blacklisted</option>
+                        </select>
+                        <select id="perfFilter">
+                            <option value="all">All Performance</option>
+                            <option value="low">Low Performance (&lt;50)</option>
+                            <option value="medium">Medium (50-79)</option>
+                            <option value="high">High (80+)</option>
+                        </select>
+                        <button class="btn2" onclick="resetFilters()">Reset Filters</button>
+                    </div>
+                    <div class="wrap admin-scroll-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Contractor ID</th>
+                                    <th>Contractor Name</th>
+                                    <th>Email</th>
+                                    <th>Assigned Tenders</th>
+                                    <th>Missed Deadlines</th>
+                                    <th>Performance Score</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contractorBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="auth-session.js"></script>
+    <script src="performance-system.js"></script>
+    <script>
+        const msg = document.getElementById('message');
+        const searchInput = document.getElementById('searchInput');
+        const statusFilter = document.getElementById('statusFilter');
+        const perfFilter = document.getElementById('perfFilter');
+        
+        let contractors = [];
+
+        function warnIfFileProtocol() {
+            if (window.location.protocol === 'file:') {
+                note('This page is opened with file://. Supabase requests may fail here. Run it with a local server like Live Server or localhost.', 'warn');
+            }
+        }
+
+        function loadUserInfo() {
+            const u = AuthSession.getCurrentUser();
+            if (!u) {
+                if (window.location.protocol === 'file:') {
+                    alert('Session not found in this tab.\n\nIf you opened this page using file:// or in a new browser tab, the login session may not be shared.\n\nRun the project on http://localhost (Live Server or node serve-localhost.js) and navigate from the dashboard.');
+                }
+                window.location.href = 'login.html';
+                return;
+            }
+            if (!AuthSession.hasRole(u, 'Admin')) {
+                window.location.href = 'login.html';
+                return
+            }
+            document.getElementById('welcomeMsg').textContent = `Welcome, ${u.username}`;
+            document.getElementById('userRole').textContent = `Role: ${u.role}`;
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                AuthSession.clearCurrentUser();
+                window.location.href = 'login.html';
+            }
+        }
+
+        function note(t, k) {
+            msg.textContent = t;
+            msg.className = `msg ${k}`;
+            setTimeout(() => msg.className = 'msg', 3500);
+        }
+
+        function esc(v) {
+            return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function uuid() {
+            if (window.crypto && window.crypto.randomUUID) {
+                return window.crypto.randomUUID();
+            }
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function getPerformanceClass(score) {
+            if (score < 50) return 'r';
+            if (score < 80) return 'y';
+            return 'g';
+        }
+
+        function getPerformanceBadge(score) {
+            const cls = getPerformanceClass(score);
+            let warning = '';
+            if (score < 50) {
+                warning = '<br><small style="color: var(--danger-text); font-weight: 600;">Low Performance</small>';
+            }
+            return `<span class="badge ${cls}">${score}${warning}</span>`;
+        }
+
+        function getStatusBadge(isBlacklisted) {
+            if (isBlacklisted) {
+                return '<span class="badge r">Blacklisted</span>';
+            }
+            return '<span class="badge g">Active</span>';
+        }
+
+        async function loadAll() {
+            try {
+                const result = await PerformanceSystem.syncContractorPerformance(supabaseClient, { persist: true });
+                contractors = result.metrics || [];
+
+                if (result.failures?.length) {
+                    console.error(result.failures);
+                    note(`Some contractor scores could not be saved. Run ${PerformanceSystem.getSetupSqlPath()} if columns are missing.`, 'warn');
+                }
+
+                render();
+            } catch (error) {
+                console.error(error);
+                note(`Unable to load contractor performance. ${error.message || 'Check console for details.'}`, 'err');
+            }
+        }
+
+        function calculateContractorData(contractor) {
+            return {
+                id: contractor.id,
+                username: contractor.username,
+                email: contractor.email || '-',
+                assignedTenders: contractor.details?.totalAssignedTenders ?? 0,
+                missedDeadlines: contractor.details?.missedDeadlines ?? 0,
+                performanceScore: contractor.performanceScore ?? 100,
+                isBlacklisted: contractor.isBlacklisted === true || contractor.isBlacklisted === 1,
+                warningText: contractor.warningText || '',
+                performanceSummary: contractor.details?.reasons?.join(', ') || 'No active penalties'
+            };
+        }
+
+        function render() {
+            const data = contractors.map(calculateContractorData);
+            updateStats(data);
+            renderTable(data);
+        }
+
+        function updateStats(data) {
+            const total = data.length;
+            const active = data.filter(c => !c.isBlacklisted).length;
+            const blacklisted = data.filter(c => c.isBlacklisted).length;
+            const lowPerf = data.filter(c => c.performanceScore < 50).length;
+
+            document.getElementById('stTotalContractors').textContent = total;
+            document.getElementById('stActive').textContent = active;
+            document.getElementById('stBlacklisted').textContent = blacklisted;
+            document.getElementById('stLowPerf').textContent = lowPerf;
+        }
+
+        function filteredData(data) {
+            const q = searchInput.value.trim().toLowerCase();
+            const sf = statusFilter.value;
+            const pf = perfFilter.value;
+
+            return data.filter(c => {
+                const matchSearch = !q || 
+                    c.username.toLowerCase().includes(q) || 
+                    c.email.toLowerCase().includes(q);
+                
+                const matchStatus = 
+                    sf === 'all' ||
+                    (sf === 'active' && !c.isBlacklisted) ||
+                    (sf === 'blacklisted' && c.isBlacklisted);
+                
+                const matchPerf = 
+                    pf === 'all' ||
+                    (pf === 'low' && c.performanceScore < 50) ||
+                    (pf === 'medium' && c.performanceScore >= 50 && c.performanceScore < 80) ||
+                    (pf === 'high' && c.performanceScore >= 80);
+
+                return matchSearch && matchStatus && matchPerf;
+            });
+        }
+
+        function renderTable(data) {
+            const body = document.getElementById('contractorBody');
+            const items = filteredData(data);
+
+            if (!items.length) {
+                const message = data.length
+                    ? 'No contractors match the current filters.'
+                    : 'No contractor data available';
+                body.innerHTML = `<tr><td colspan="8"><div class="empty">${message}</div></td></tr>`;
+                return;
+            }
+
+            body.innerHTML = items.map(c => `
+                <tr>
+                    <td>${esc(shortId(c.id))}</td>
+                    <td>${esc(c.username)}</td>
+                    <td>${esc(c.email)}</td>
+                    <td>${c.assignedTenders}</td>
+                    <td style="${c.missedDeadlines > 0 ? 'color: var(--danger); font-weight: 600;' : ''}">${c.missedDeadlines}</td>
+                    <td>${getPerformanceBadge(c.performanceScore)}</td>
+                    <td>${getStatusBadge(c.isBlacklisted)}</td>
+                    <td>
+                        <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
+                            ${c.warningText ? `<small style="color: var(--warning-text); font-weight: 700;">${esc(c.warningText)}</small>` : ''}
+                            <small style="color: var(--text-muted);">${esc(c.performanceSummary)}</small>
+                        </div>
+                        <button class="btn2" style="padding: 6px 12px; font-size: 13px; ${c.isBlacklisted ? 'color: var(--success);' : 'color: var(--danger);'}" onclick="toggleBlacklist('${c.id}', ${!c.isBlacklisted})">
+                            <i class="ph ${c.isBlacklisted ? 'ph-check-circle' : 'ph-prohibit'}"></i> 
+                            ${c.isBlacklisted ? 'Unblacklist' : 'Blacklist'}
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function shortId(v) {
+            return !v ? '-' : (v.length > 8 ? `${v.slice(0, 8)}...` : v);
+        }
+
+        function resetFilters() {
+            searchInput.value = '';
+            statusFilter.value = 'all';
+            perfFilter.value = 'all';
+            const data = contractors.map(calculateContractorData);
+            renderTable(data);
+        }
+
+        async function toggleBlacklist(userId, shouldBlacklist) {
+            const action = shouldBlacklist ? 'blacklist' : 'unblacklist';
+            if (!confirm(`Are you sure you want to ${action} this contractor?`)) return;
+
+            PerformanceSystem.setBlacklistOverride(userId, !shouldBlacklist);
+
+            const updateData = shouldBlacklist
+                ? { is_blacklisted: true, performance_score: 0 }
+                : { is_blacklisted: false };
+
+            const { error } = await supabaseClient
+                .from('users')
+                .update(updateData)
+                .eq('id', userId);
+
+            if (error) {
+                console.error(error);
+                note(`Failed to ${action} contractor.`, 'err');
+                return;
+            }
+
+            note(`Contractor ${action}ed successfully.`, 'ok');
+            await loadAll();
+        }
+
+        [searchInput, statusFilter, perfFilter].forEach(x => {
+            x.addEventListener('input', () => {
+                const data = contractors.map(calculateContractorData);
+                renderTable(data);
+            });
+            x.addEventListener('change', () => {
+                const data = contractors.map(calculateContractorData);
+                renderTable(data);
+            });
+        });
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            warnIfFileProtocol();
+            loadUserInfo();
+            await loadAll();
+
+            setInterval(loadAll, 30000);
+
+            try {
+                supabaseClient.channel('contractor-realtime')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => loadAll())
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'Project' }, () => loadAll())
+                    .subscribe();
+            } catch (e) {
+                console.warn('Realtime subscription not available, using polling only.', e);
+            }
+        });
+    </script>
+</body>
+</html>

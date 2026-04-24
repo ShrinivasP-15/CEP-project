@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Register - Tender Monitoring System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="auth.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+
+<body class="portal-page">
+    <div class="portal-shell">
+        <header class="portal-topbar">
+            <div class="portal-brand">
+                <div class="portal-brand-mark"><i class="ph-fill ph-buildings"></i></div>
+                <div class="portal-brand-copy">
+                    <span class="portal-brand-title">TENDER MONITORING SYSTEM</span>
+                    <span class="portal-brand-subtitle">Demo Portal</span>
+                </div>
+            </div>
+
+            <div class="portal-topbar-title">
+                <h1>TENDER MONITORING SYSTEM</h1>
+                <p>Transparent | Efficient | Accountable</p>
+            </div>
+
+            <div class="portal-date">
+                <i class="ph ph-calendar-dots"></i>
+                <span data-live-date>Loading...</span>
+            </div>
+        </header>
+
+        <nav class="portal-nav">
+            <div class="portal-nav-links">
+                <a class="nav-link active" href="index.html"><i class="ph ph-house"></i>Home</a>
+                <span class="nav-sep">|</span>
+                <a class="nav-link" href="index.html#about">About</a>
+                <span class="nav-sep">|</span>
+                <a class="nav-link" href="forgot.html">Help</a>
+            </div>
+        </nav>
+
+        <main class="portal-main">
+            <section class="register-stage">
+                <article class="auth-card register-card">
+                    <div class="auth-title">
+                        <h2>User Registration</h2>
+                        <div class="line"></div>
+                    </div>
+                    <p class="auth-subtitle">Create your account to access the system</p>
+
+                    <form onsubmit="registerUser(event)" class="auth-form">
+                        <div class="field-group">
+                            <label class="field-label" for="username">Username</label>
+                            <div class="input-shell">
+                                <i class="ph ph-user input-icon"></i>
+                                <input class="auth-input" type="text" id="username" placeholder="Enter your username" required>
+                            </div>
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label" for="email">Email</label>
+                            <div class="input-shell">
+                                <i class="ph ph-envelope-simple input-icon"></i>
+                                <input class="auth-input" type="email" id="email" placeholder="Enter your email address" required>
+                            </div>
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label" for="password">Password</label>
+                            <div class="input-shell">
+                                <i class="ph ph-lock-simple input-icon"></i>
+                                <input class="auth-input" type="password" id="password" placeholder="Create a password" required>
+                            </div>
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label" for="role">Select Role</label>
+                            <div class="input-shell">
+                                <i class="ph ph-caret-down input-icon" aria-hidden="true"></i>
+                                <select class="auth-select" id="role" required>
+                                    <option value="" disabled selected>Select role</option>
+                                    <option value="User">User</option>
+                                    <option value="Contractor">Contractor</option>
+                                    <option value="Admin">Admin</option>
+                                    <option value="Verification Officer">Verification Officer</option>
+                                    <option value="Auditor">Auditor</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button class="auth-button auth-button-primary" type="submit">Register</button>
+
+                        <div class="divider"><span>OR</span></div>
+
+                        <a href="login.html" class="auth-secondary-button">
+                            Already have an account? Login
+                        </a>
+                    </form>
+                </article>
+            </section>
+        </main>
+
+        <footer class="portal-footer portal-footer-dark">
+            <div class="footer-grid">
+                <div class="footer-item">
+                    <div class="footer-mark"><i class="ph ph-shield-check"></i></div>
+                    <div class="footer-copy">
+                        <div>This is a secure system.</div>
+                        <div>Unauthorized access is prohibited.</div>
+                    </div>
+                </div>
+
+                <div class="footer-center">
+                    <div>&copy; 2025 Tender Monitoring System (Demo)</div>
+                    <div>For Academic Use Only</div>
+                </div>
+
+                <div class="footer-right">
+                    <strong>Designed &amp; Developed by Team Project</strong>
+                </div>
+            </div>
+        </footer>
+    </div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="live-date.js"></script>
+    <script>
+        // User Registration: Logic for creating new accounts with identity verification
+        async function registerUser(event) {
+        event.preventDefault();
+
+        const username = document.getElementById('username').value.trim();
+        const email = document.getElementById('email').value.trim().toLowerCase();
+        const password = document.getElementById('password').value;
+        const role = document.getElementById('role').value;
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+
+        if (!username || !email || !password || !role) {
+            alert('Please fill in all registration fields.');
+            return;
+        }
+
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="ph ph-circle-notch"></i> Registering...';
+
+        try {
+            const { data: userByUsername, error: usernameError } = await supabaseClient
+                .from('users')
+                .select('id')
+                .eq('username', username)
+                .maybeSingle();
+
+            if (usernameError) {
+                console.error('Username check failed:', usernameError);
+                alert('Unable to verify username. ' + (usernameError.message || 'Please try again.'));
+                return;
+            }
+
+            if (userByUsername) {
+                alert('Username already exists. Please choose another username.');
+                return;
+            }
+
+            const { data: userByEmail, error: emailError } = await supabaseClient
+                .from('users')
+                .select('id')
+                .eq('email', email)
+                .maybeSingle();
+
+            if (emailError) {
+                console.error('Email check failed:', emailError);
+                alert('Unable to verify email. ' + (emailError.message || 'Please try again.'));
+                return;
+            }
+
+            if (userByEmail) {
+                alert('Email already exists. Please use another email address.');
+                return;
+            }
+
+            const { error } = await supabaseClient
+                .from('users')
+                .insert([{ username, email, password, role }]);
+
+            if (error) {
+                console.error('Registration error:', error);
+                alert('Registration failed: ' + (error.message || 'Please try again.'));
+                return;
+            }
+
+            alert('Registration successful! You can now login with your credentials.');
+            window.location.href = 'login.html';
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    }
+</script>
+
+</body>
+</html>

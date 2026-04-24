@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Applications | Public Works Monitoring System</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div class="app">
+        <aside class="side">
+            <div>
+                <h1>Public Works Portal</h1>
+            </div>
+            <div class="nav">
+                <button type="button" onclick="window.location.href='project-management.html'"><i class="ph ph-squares-four"></i> Dashboard</button>
+                <button type="button" onclick="window.location.href='project-management.html#projects'"><i class="ph ph-files"></i> Tenders</button>
+                <button type="button" onclick="window.location.href='project-management.html#add'"><i class="ph ph-plus-circle"></i> Publish Tender</button>
+                <button type="button" class="active"><i class="ph-fill ph-check-circle"></i> Applications</button>
+                <button type="button" onclick="window.location.href='contractor-performance.html'"><i class="ph ph-chart-line-up"></i> Contractor Performance</button>
+                <button type="button" onclick="window.location.href='history.html'"><i class="ph ph-archive-box"></i> History</button>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="top">
+                <div>
+                    <h2>Tender Applications</h2>
+                    <p>View all contractor applications and accept or reject them.</p>
+                </div>
+                <div class="topr">
+                    <div class="user"><strong id="welcomeMsg">Welcome, Admin</strong><small id="userRole">Role: Admin</small></div>
+                    <button class="logout" onclick="logout()"><i class="ph ph-sign-out"></i> Logout</button>
+                </div>
+            </div>
+
+            <div id="message" class="msg"></div>
+
+            <div class="head">
+                <h3>Applications</h3>
+                <p>Manage contractor applications submitted for published tenders.</p>
+            </div>
+
+            <div class="card">
+                <div class="wrap admin-scroll-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Application ID</th>
+                                <th>Tender Title</th>
+                                <th>Contractor Name</th>
+                                <th>Contractor ID</th>
+                                <th>Performance</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="applicationBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="acceptModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="acceptModalTitle">
+        <div class="modal-content" style="max-width: 760px;">
+            <div class="modal-header">
+                <h4 id="acceptModalTitle">Accept Application</h4>
+                <button type="button" class="modal-close" onclick="closeAcceptModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="acceptModalInfo" style="margin-bottom:16px;"></div>
+                <div id="acceptExistingStagesNotice" style="margin-bottom:16px;"></div>
+                <div id="acceptStageBuilder">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <strong>Project Stages</strong>
+                        <button type="button" class="btn2" onclick="addAcceptanceStageRow()"><i class="ph ph-plus-circle"></i> Add Stage</button>
+                    </div>
+                    <div id="acceptStagesList" style="display:grid;gap:12px;"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn" onclick="confirmAcceptApplication()"><i class="ph ph-check-circle"></i> Confirm Acceptance</button>
+                <button type="button" class="btn2" onclick="closeAcceptModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="auth-session.js"></script>
+    <script src="performance-system.js"></script>
+    <script src="stage-workflow.js"></script>
+    <!-- Applications Management: Admin logic to process bids and assign projects -->
+    <script>
+        const messageBox=document.getElementById('message');
+        const APPLICATIONS_STORAGE_KEY='applications';
+        const TENDER_META_KEY='tenderMeta';
+        const STAGE_UPDATE_KEY='contractorStageUpdates';
+        const STAGE_META_KEY='contractorStageMeta';
+        let applications=[],tenders=[],useLocalApplications=false,performanceMetrics=[],selectedAcceptance=null;
+
+        function loadUserInfo(){
+            const u=AuthSession.getCurrentUser();
+            if(!u){
+                if(window.location.protocol==='file:'){
+                    alert('Session not found in this tab.\n\nIf you opened this page using file:// or in a new browser tab, the login session may not be shared.\n\nRun the project on http://localhost (Live Server or node serve-localhost.js) and navigate from the dashboard.');
+                }
+                window.location.href='login.html';
+                return;
+            }
+            if(!AuthSession.hasRole(u,'Admin')){window.location.href='login.html';return}
+            document.getElementById('welcomeMsg').textContent=`Welcome, ${u.username}`;
+            document.getElementById('userRole').textContent=`Role: ${u.role}`;
+        }
+        function logout(){if(confirm('Are you sure you want to logout?')){AuthSession.clearCurrentUser();window.location.href='login.html'}}
+        function note(text,type){messageBox.textContent=text;messageBox.className=`msg ${type}`;setTimeout(()=>messageBox.className='msg',3500)}
+        function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+        function enc(v){return encodeURIComponent(String(v??''))}
+        function shortId(v){return !v?'-':(String(v).length>10?`${String(v).slice(0,10)}...`:String(v))}
+        function appStatus(value){return value||'Pending'}
+        function statusClass(value){if(value==='Accepted')return'status-accepted';if(value==='Rejected')return'status-rejected';return'status-pending'}
+        function tenderTitle(tenderId){const tender=tenders.find(item=>item.proj_id===tenderId);return tender?.['Name']||'Tender not found'}
+        function getLocalApplications(){try{return JSON.parse(localStorage.getItem(APPLICATIONS_STORAGE_KEY)||'[]')}catch{return[]}}
+        function setLocalApplications(items){localStorage.setItem(APPLICATIONS_STORAGE_KEY,JSON.stringify(items))}
+        function getTenderMeta(){try{return JSON.parse(localStorage.getItem(TENDER_META_KEY)||'{}')}catch{return {}}}
+        function setTenderMeta(items){localStorage.setItem(TENDER_META_KEY,JSON.stringify(items))}
+        function mergeTenderMeta(list){const meta=getTenderMeta();return list.map(item=>meta[item.proj_id]?{...item,...meta[item.proj_id]}:item)}
+        function getLocalStages(){try{return JSON.parse(localStorage.getItem(STAGE_UPDATE_KEY)||'[]')}catch{return[]}}
+        function setLocalStages(items){localStorage.setItem(STAGE_UPDATE_KEY,JSON.stringify(items))}
+        function getStageMeta(){try{return JSON.parse(localStorage.getItem(STAGE_META_KEY)||'{}')}catch{return {}}}
+        function setStageMeta(items){localStorage.setItem(STAGE_META_KEY,JSON.stringify(items))}
+        function stageStatusBadge(value){if(value==='Paid')return'<span class="badge g">Paid</span>';if(value==='Verified')return'<span class="badge g">Verified</span>';if(value==='Completed')return'<span class="badge y">Completed</span>';if(value==='Rejected')return'<span class="badge r">Rejected</span>';if(value==='In Progress')return'<span class="badge b">In Progress</span>';if(value==='Not Started')return'<span class="badge p">Not Started</span>';return`<span class="badge p">${esc(value||'-')}</span>`}
+        function isPendingApplication(app){return appStatus(app.status)==='Pending'}
+        function normalizeStageRecord(stage){const meta=getStageMeta()[stage.stage_id]||{};return{stage_id:stage.stage_id,proj_id:stage.proj_id,full_proj_id:meta.full_proj_id||stage.proj_id,contractor_id:stage.contractor_id??meta.contractor_id??'',stage_name:meta.stage_name||stage.stage_name||'Stage',status:StageWorkflow.normalizeStatus(stage),remarks:meta.remarks||stage.remarks||'',date:meta.date||stage.date||stage['start date']||'',end_date:meta.end_date||stage['end date']||stage.end_date||'',stage_amount:meta.stage_amount??stage.stage_amount??'',payment_status:meta.payment_status||stage.payment_status||'Pending',payment_date:meta.payment_date||stage.payment_date||'',proof_image_url:meta.proof_image_url||meta.image_url||stage.proof_image_url||stage.image_url||''}}
+        async function getStagesForTender(tenderId){const response=await supabaseClient.from('Stage Tracking').select('*').eq('proj_id',tenderId);if(response.error){console.error(response.error);return getLocalStages().filter(stage=>String(stage.full_proj_id||stage.proj_id)===String(tenderId))}const dbStages=(response.data||[]).map(normalizeStageRecord);const localStages=getLocalStages();const known=new Set(dbStages.map(stage=>String(stage.stage_id)));return [...dbStages,...localStages.filter(stage=>String(stage.full_proj_id||stage.proj_id)===String(tenderId)&&!known.has(String(stage.stage_id)))]}
+        function addDaysToDate(dateValue,days){const base=new Date(dateValue);if(Number.isNaN(base.getTime()))return null;base.setDate(base.getDate()+Number(days||0));return base.toISOString().split('T')[0]}
+        function closeAcceptModal(){selectedAcceptance=null;document.getElementById('acceptStagesList').innerHTML='';document.getElementById('acceptExistingStagesNotice').innerHTML='';document.getElementById('acceptStageBuilder').style.display='block';document.getElementById('acceptModal').classList.remove('open')}
+        function addAcceptanceStageRow(values={}){const id=`stage-row-${Date.now()}-${Math.floor(Math.random()*1000)}`;const list=document.getElementById('acceptStagesList');const row=document.createElement('div');row.className='card';row.style.padding='16px';row.dataset.rowId=id;row.innerHTML=`<div style="display:grid;grid-template-columns:1.3fr 1fr 1fr auto;gap:10px;align-items:end;"><div><label>Stage Name *</label><input type="text" class="accept-stage-name" value="${esc(values.stage_name||'')}" placeholder="e.g. Foundation"></div><div><label>Deadline *</label><input type="date" class="accept-stage-deadline" value="${esc(values.end_date||'')}"></div><div><label>Amount *</label><input type="number" min="0" step="0.01" class="accept-stage-amount" value="${esc(values.stage_amount||'')}" placeholder="0.00"></div><button type="button" class="btn2" onclick="removeAcceptanceStageRow('${id}')"><i class="ph ph-trash"></i></button></div>`;list.appendChild(row)}
+        function removeAcceptanceStageRow(rowId){const row=[...document.querySelectorAll('#acceptStagesList [data-row-id]')].find(item=>item.dataset.rowId===rowId);if(row)row.remove()}
+        async function openAcceptModal(applicationId){const app=applications.find(item=>String(item.application_id)===String(applicationId));if(!app)return;const currentStatus=appStatus(app.status);if(currentStatus!=='Pending'){note(`Only pending applications can be processed. Current status: ${currentStatus}.`,'warn');return}const tender=tenders.find(item=>String(item.proj_id)===String(app.tender_id));const republished=tender?.republished===true||String(tender?.['Status']||'').toLowerCase()==='re-published';const alreadyAssigned=((tender?.assigned_contractor_id&&String(tender.assigned_contractor_id).trim()!=='')||(tender?.['Assigned officer']&&tender['Assigned officer']!=='Not Assigned'))&&!republished;if(alreadyAssigned){note('This tender already has an assigned contractor. Remove the contractor and re-publish the tender before accepting another application.','err');return}const stages=await getStagesForTender(app.tender_id);
+            
+            selectedAcceptance={application:app,tender,stages};
+            
+            document.getElementById('acceptModalInfo').innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; background: var(--bg-alt); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 24px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+                    <div style="grid-column: span 2;">
+                        <small style="text-transform: uppercase; color: var(--text-muted); font-weight: 800; font-size: 11px; letter-spacing: 0.05em;">Tender Title</small><br>
+                        <strong style="font-size: 15px; color: var(--primary);">${esc(tender?.['Name'] || app.tender_id || '-')}</strong>
+                    </div>
+                    <div>
+                        <small style="text-transform: uppercase; color: var(--text-muted); font-weight: 800; font-size: 11px; letter-spacing: 0.05em;">Contractor Name</small><br>
+                        <strong style="font-size: 15px; color: var(--primary);">${esc(app.contractor_name || app.contractor_id || '-')}</strong>
+                    </div>
+                    <div>
+                        <small style="text-transform: uppercase; color: var(--text-muted); font-weight: 800; font-size: 11px; letter-spacing: 0.05em;">Total Budget</small><br>
+                        <strong style="font-size: 15px; color: var(--success);"><i class="ph ph-currency-inr"></i> ${esc(tender?.['Budget'] || '-')}</strong>
+                    </div>
+                    <div style="grid-column: span 2; border-left: 2px dashed var(--border); padding-left: 20px;">
+                        <small style="text-transform: uppercase; color: var(--text-muted); font-weight: 800; font-size: 11px; letter-spacing: 0.05em;">Overall Tender Deadline</small><br>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                            <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--danger-bg); color: var(--danger-text); display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                                <i class="ph-fill ph-calendar-check"></i>
+                            </div>
+                            <strong style="color: var(--danger-text); font-size: 20px; letter-spacing: -0.01em;">${esc(tender?.['End Date'] || '-')}</strong>
+                        </div>
+                    </div>
+                </div>`;
+            
+            document.getElementById('acceptStagesList').innerHTML='';if(stages.length){document.getElementById('acceptStageBuilder').style.display='none';document.getElementById('acceptExistingStagesNotice').innerHTML=`<div class="msg warn" style="display:block;margin:0;">Stages already exist for this tender and are locked. Acceptance will reuse only incomplete stages for the new contractor.</div><table style="width:100%;margin-top:10px;"><thead><tr><th>Stage</th><th>Deadline</th><th>Amount</th><th>Status</th></tr></thead><tbody>${stages.map(stage=>`<tr><td>${esc(stage.stage_name)}</td><td>${esc(stage.end_date||'-')}</td><td>${esc(stage.stage_amount||'-')}</td><td>${stageStatusBadge(stage.status)}</td></tr>`).join('')}</tbody></table>`}else{document.getElementById('acceptExistingStagesNotice').innerHTML='<div class="msg warn" style="display:block;margin:0 0 12px 0;">Stage creation is mandatory when accepting this application.</div>';document.getElementById('acceptStageBuilder').style.display='block';addAcceptanceStageRow()}document.getElementById('acceptModal').classList.add('open')}
+        function collectAcceptanceStages(){return [...document.querySelectorAll('#acceptStagesList [data-row-id]')].map(row=>({stage_name:row.querySelector('.accept-stage-name')?.value.trim(),end_date:row.querySelector('.accept-stage-deadline')?.value,stage_amount:row.querySelector('.accept-stage-amount')?.value}))}
+
+        async function loadData(){
+            const [applicationsRes,tendersRes]=await Promise.all([
+                supabaseClient.from('Applications').select('*').order('application_id',{ascending:false}),
+                supabaseClient.from('Project').select('*')
+            ]);
+
+            if(tendersRes.error){console.error(tendersRes.error);note('Unable to load tenders.','err');return}
+
+            tenders=mergeTenderMeta(tendersRes.data||[]);
+            if(applicationsRes.error){
+                console.error(applicationsRes.error);
+                const localApps=getLocalApplications();
+                applications=localApps.filter(app=>appStatus(app.status)==='Pending');
+                useLocalApplications=true;
+                note('Applications table not available in Supabase. Showing local application data.','warn');
+            }else{
+                const allApps=applicationsRes.data||[];
+                applications=allApps.filter(app=>appStatus(app.status)==='Pending');
+                useLocalApplications=false;
+                setLocalApplications(allApps);
+            }
+
+            try{
+                const perf=await PerformanceSystem.loadPerformanceData(supabaseClient);
+                performanceMetrics=perf.metrics||[];
+            }catch(error){
+                console.error(error);
+                performanceMetrics=[];
+                note(`Performance data unavailable. ${error.message||''}`.trim(),'warn');
+            }
+            renderTable();
+        }
+
+        function renderTable(){
+            const body=document.getElementById('applicationBody');
+            if(!applications.length){
+                body.innerHTML='<tr><td colspan="7"><div class="empty">No pending applications found</div></td></tr>';
+                return;
+            }
+
+            body.innerHTML=applications.map(app=>{
+                const metric=PerformanceSystem.metricForApplication(performanceMetrics,app);
+                const status=appStatus(app.status);
+                const limitReached=metric?metric.details?.activeProjects >= PerformanceSystem.MAX_ACTIVE_PROJECTS:false;
+                const acceptDisabled=status==='Accepted'||limitReached?'disabled':'';
+                const rejectDisabled=status==='Rejected'?'disabled':'';
+                const isFinalDecision=status==='Accepted'||status==='Rejected';
+                const performanceCell=metric
+                    ? `<div style="display:flex; flex-direction:column; gap:4px;"><span class="badge ${metric.isBlacklisted?'r':metric.performanceScore<50?'y':'g'}">${esc(metric.performanceScore)}</span><small style="color:var(--text-muted);">${esc(metric.details?.activeProjects ?? 0)}/${PerformanceSystem.MAX_ACTIVE_PROJECTS} active</small>${metric.warningText?`<small style="color:var(--warning-text); font-weight:700;">${esc(metric.warningText)}</small>`:''}${limitReached?`<small style="color:var(--danger-text); font-weight:700;">Workload limit reached</small>`:''}</div>`
+                    : '<span class="badge b">N/A</span>';
+                return `<tr>
+                    <td>${esc(shortId(app.application_id))}</td>
+                    <td>${esc(tenderTitle(app.tender_id))}</td>
+                    <td>${esc(app.contractor_name||'-')}</td>
+                    <td>${esc(app.contractor_id||'-')}</td>
+                    <td>${performanceCell}</td>
+                    <td><span class="${statusClass(status)}">${esc(status)}</span></td>
+                    <td>
+                        ${isFinalDecision
+                            ? `<span style="color:var(--text-muted);font-weight:600;">Decision Locked</span>`
+                            : `<div class="actions">
+                                <button class="btn accept" data-application-id="${enc(app.application_id)}" data-tender-id="${enc(app.tender_id)}" data-contractor-name="${enc(app.contractor_name||'')}" data-status="Accepted" onclick="handleApplicationAction(this)" ${acceptDisabled}>Accept</button>
+                                <button class="btn reject" data-application-id="${enc(app.application_id)}" data-tender-id="${enc(app.tender_id)}" data-contractor-name="${enc(app.contractor_name||'')}" data-status="Rejected" onclick="handleApplicationAction(this)" ${rejectDisabled}>Reject</button>
+                            </div>`}
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function handleApplicationAction(button){
+            const applicationId=decodeURIComponent(button.dataset.applicationId||'');
+            const tenderId=decodeURIComponent(button.dataset.tenderId||'');
+            const contractorName=decodeURIComponent(button.dataset.contractorName||'');
+            const status=button.dataset.status||'Pending';
+            if(status==='Accepted'){openAcceptModal(applicationId);return}
+            updateApplicationStatus(applicationId,status,tenderId,contractorName);
+        }
+
+        async function updateApplicationStatus(applicationId,status,tenderId,contractorName){
+            const application=applications.find(app=>String(app.application_id)===String(applicationId));
+            const contractorMetric=application?PerformanceSystem.metricForApplication(performanceMetrics,application):null;
+            const currentStatus=appStatus(application?.status);
+            const tender=tenders.find(item=>String(item.proj_id)===String(tenderId));
+
+            if(!application){note('Application not found.','err');return}
+            if(currentStatus!=='Pending'){note(`Only pending applications can be processed. Current status: ${currentStatus}.`,'warn');return}
+            if(status==='Accepted'){
+                const republished=tender?.republished===true||String(tender?.['Status']||'').toLowerCase()==='re-published';
+                const alreadyAssigned=((tender?.assigned_contractor_id&&String(tender.assigned_contractor_id).trim()!=='')||(tender?.['Assigned officer']&&tender['Assigned officer']!=='Not Assigned'))&&!republished;
+                if(alreadyAssigned){
+                    note('This tender already has an assigned contractor. Remove the contractor and re-publish the tender before accepting another application.','err');
+                    return;
+                }
+            }
+
+            if(status==='Accepted' && contractorMetric?.isBlacklisted){
+                note('Blacklisted contractors cannot be assigned to tenders. Unblacklist them from Contractor Performance first.','err');
+                return;
+            }
+
+            if(status==='Accepted' && contractorMetric && contractorMetric.details?.activeProjects >= PerformanceSystem.MAX_ACTIVE_PROJECTS){
+                note(`Assignment blocked. ${PerformanceSystem.getWorkloadMessage()} Contractor already has ${contractorMetric.details.activeProjects} active projects.`,'err');
+                return;
+            }
+
+            if(useLocalApplications){
+                const updated=getLocalApplications().map(app=>String(app.application_id)===String(applicationId)?{...app,status}:app);
+                setLocalApplications(updated);
+            }else{
+                const updateRes=await supabaseClient.from('Applications').update({status}).eq('application_id',applicationId);
+                if(updateRes.error){console.error(updateRes.error);note(`Failed to ${status.toLowerCase()} application.`,'err');return}
+            }
+
+            if(status==='Accepted'){
+                const tenderMeta=getTenderMeta();
+                tenderMeta[tenderId]={
+                    ...(tenderMeta[tenderId]||{}),
+                    'Assigned officer':contractorName||'Not Assigned',
+                    assigned_contractor_id: contractorMetric?.id || '',
+                    Status:'Open',
+                    republished:false
+                };
+                setTenderMeta(tenderMeta);
+
+                let tenderUpdate=await supabaseClient
+                    .from('Project')
+                    .update({
+                        'Assigned officer':contractorName||'Not Assigned',
+                        assigned_contractor_id: contractorMetric?.id || null,
+                        Status: 'Open'
+                    })
+                    .eq('proj_id',tenderId);
+
+                if(tenderUpdate.error){
+                    tenderUpdate=await supabaseClient
+                        .from('Project')
+                        .update({'Assigned officer':contractorName||'Not Assigned','Status':'Open'})
+                        .eq('proj_id',tenderId);
+                }
+
+                if(tenderUpdate.error){
+                    console.error(tenderUpdate.error);
+                    await loadData();
+                    return;
+                }
+
+                const currentProjectStages=await getStagesForTender(tenderId);
+                if(currentProjectStages.length){
+                    const stageMeta=getStageMeta();
+                    const updatedLocalStages=getLocalStages().map(stage=>{
+                        const isCurrentTender=String(stage.full_proj_id||stage.proj_id)===String(tenderId);
+                        const isCompleted=['Completed','Verified','Paid'].includes(String(stage.status||''));
+                        if(!isCurrentTender||isCompleted)return stage;
+                        return {...stage,contractor_id:contractorMetric?.id||application.contractor_id||'',full_proj_id:tenderId};
+                    });
+                    setLocalStages(updatedLocalStages);
+                    currentProjectStages.filter(stage=>!['Completed','Verified','Paid'].includes(String(stage.status))).forEach(stage=>{
+                        stageMeta[stage.stage_id]={...(stageMeta[stage.stage_id]||{}),contractor_id:contractorMetric?.id||application.contractor_id||'',full_proj_id:tenderId};
+                    });
+                    setStageMeta(stageMeta);
+                    let stageUpdate=await supabaseClient.from('Stage Tracking').update({contractor_id:contractorMetric?.id||application.contractor_id||''}).eq('proj_id',tenderId).neq('status','Completed').neq('status','Verified').neq('status','Paid');
+                    if(stageUpdate.error){console.error(stageUpdate.error)}
+                }
+
+                const otherPending=applications.filter(app=>String(app.tender_id)===String(tenderId)&&String(app.application_id)!==String(applicationId)&&appStatus(app.status)==='Pending');
+                if(otherPending.length){
+                    if(useLocalApplications){
+                        const updated=getLocalApplications().map(app=>String(app.tender_id)===String(tenderId)&&String(app.application_id)!==String(applicationId)&&appStatus(app.status)==='Pending'?{...app,status:'Rejected'}:app);
+                        setLocalApplications(updated);
+                    }else{
+                        const rejectRes=await supabaseClient.from('Applications').update({status:'Rejected'}).eq('tender_id',tenderId).neq('application_id',applicationId).eq('status','Pending');
+                        if(rejectRes.error){console.error(rejectRes.error)}
+                    }
+                }
+
+                try{
+                    await PerformanceSystem.syncContractorPerformance(supabaseClient,{persist:true});
+                }catch(error){
+                    console.error(error);
+                }
+            }
+
+            await loadData();
+        }
+
+        async function createStagesForAcceptedApplication(application,stages,contractorMetric){
+            const tender=tenders.find(item=>String(item.proj_id)===String(application.tender_id));
+            const stageMeta=getStageMeta();
+            const localStages=getLocalStages();
+
+            for(let index=0;index<stages.length;index++){
+                const stage=stages[index];
+                const stageId=(window.crypto&&window.crypto.randomUUID)?window.crypto.randomUUID():`${Date.now()}-${index}`;
+                const status='Not Started';
+                const payload={stage_id:stageId,proj_id:application.tender_id,full_proj_id:application.tender_id,contractor_id:contractorMetric?.id||application.contractor_id||'',stage_name:stage.stage_name,status,remarks:'',date:new Date().toISOString().split('T')[0],end_date:stage.end_date,stage_amount:stage.stage_amount,payment_status:'Pending',payment_date:'',proof_image_url:''};
+                stageMeta[stageId]={stage_name:stage.stage_name,remarks:'',date:new Date().toISOString().split('T')[0],full_proj_id:application.tender_id,tender_name:tender?.['Name']||'Tender',contractor_id:contractorMetric?.id||application.contractor_id||'',end_date:stage.end_date,stage_amount:stage.stage_amount,payment_status:'Pending',payment_date:'',proof_image_url:''};
+                localStages.unshift(payload);
+
+                let response=await supabaseClient.from('Stage Tracking').insert([{stage_id:stageId,proj_id:application.tender_id,contractor_id:contractorMetric?.id||application.contractor_id||'',stage_name:stage.stage_name,status,remarks:'',date:new Date().toISOString().split('T')[0],'start date':new Date().toISOString().split('T')[0],'end date':stage.end_date,stage_amount:Number(stage.stage_amount),payment_status:'Pending',payment_date:null}]);
+                if(response.error){
+                    response=await supabaseClient.from('Stage Tracking').insert([{stage_id:stageId,proj_id:application.tender_id,stage_name:stage.stage_name,status,remarks:'',date:new Date().toISOString().split('T')[0],'start date':new Date().toISOString().split('T')[0],'end date':stage.end_date}]);
+                }
+                if(response.error){
+                    console.error(response.error);
+                }
+            }
+
+            setStageMeta(stageMeta);
+            setLocalStages(localStages);
+        }
+
+        async function confirmAcceptApplication(){
+            if(!selectedAcceptance){note('No application selected for acceptance.','err');return}
+            const { application, stages }=selectedAcceptance;
+            const contractorMetric=PerformanceSystem.metricForApplication(performanceMetrics,application);
+            if(!stages.length){
+                const newStages=collectAcceptanceStages();
+                if(!newStages.length){note('Add at least one stage before accepting the application.','err');return}
+                for(const stage of newStages){
+                    if(!stage.stage_name||!stage.end_date||!stage.stage_amount){note('Every stage must include stage name, stage deadline, and stage amount.','err');return}
+                    if(Number(stage.stage_amount)<0){note('Stage amount must be zero or greater.','err');return}
+                }
+                await createStagesForAcceptedApplication(application,newStages,contractorMetric);
+            }
+            await updateApplicationStatus(application.application_id,'Accepted',application.tender_id,application.contractor_name||'');
+            closeAcceptModal();
+        }
+
+        window.handleApplicationAction=handleApplicationAction;
+        window.closeAcceptModal=closeAcceptModal;
+        window.addAcceptanceStageRow=addAcceptanceStageRow;
+        window.removeAcceptanceStageRow=removeAcceptanceStageRow;
+        window.confirmAcceptApplication=confirmAcceptApplication;
+        window.addEventListener('DOMContentLoaded',async()=>{
+            loadUserInfo();
+            await loadData();
+            // Auto-refresh every 15 seconds to keep dashboard live
+            setInterval(loadData, 15000);
+            // Supabase Realtime: instant refresh on DB changes
+            try {
+                supabaseClient.channel('applications-realtime')
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Applications'},()=>loadData())
+                    .on('postgres_changes',{event:'*',schema:'public',table:'Project'},()=>loadData())
+                    .subscribe();
+            } catch(e){ console.warn('Realtime subscription not available, using polling only.',e); }
+        });
+    </script>
+</body>
+</html>

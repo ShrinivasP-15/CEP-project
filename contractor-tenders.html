@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contractor Workspace | Public Works Monitoring System</title>
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="contractor.css">
+</head>
+<body>
+    <!-- Contractor Workspace: Portal for bidding, project tracking, and stage updates -->
+    <div class="app">
+        <aside class="side">
+            <div>
+                <h1>Public Works Portal</h1>
+            </div>
+            <div class="nav">
+                <button type="button" onclick="switchTab('available')"><i class="ph ph-list"></i> Available Tenders</button>
+                <button type="button" onclick="switchTab('work')"><i class="ph ph-briefcase"></i> My Projects</button>
+                <button type="button" onclick="switchTab('work');document.getElementById('stageForm').scrollIntoView({behavior:'smooth'});"><i class="ph ph-pencil-simple"></i> Stage Update</button>
+                <button type="button" onclick="openExtensionRequest()"><i class="ph ph-calendar-plus"></i> Extension Request</button>
+                <button type="button" onclick="switchTab('history')"><i class="ph ph-archive-box"></i> History</button>
+            </div>
+        </aside>
+        <div class="main">
+            <div class="container">
+        <div class="topbar">
+            <div>
+                <h1><i class="ph-fill ph-buildings" style="color: var(--primary); margin-right: 8px;"></i>Contractor Workspace</h1>
+                <p>View available tenders, apply, and update assigned work stage-wise.</p>
+            </div>
+            <div class="userbox">
+                <div>
+                    <strong id="welcomeMsg"></strong>
+                    <small id="userRole"></small>
+                </div>
+                <button class="logout" onclick="logout()"><i class="ph ph-sign-out" style="margin-right: 6px;"></i>Logout</button>
+            </div>
+        </div>
+
+        <div id="message" class="msg"></div>
+        <div id="alertsContainer" style="margin-bottom:20px; display:flex; flex-direction:column; gap:10px;"></div>
+        <div class="stats">
+            <div class="stat"><i class="ph-duotone ph-files" style="font-size: 32px; color: var(--primary); margin-bottom: 8px;"></i><small>Total Tenders</small><strong id="statTotal">0</strong></div>
+            <div class="stat"><i class="ph-duotone ph-folder-open" style="font-size: 32px; color: var(--warning); margin-bottom: 8px;"></i><small>Open Tenders</small><strong id="statOpen">0</strong></div>
+            <div class="stat"><i class="ph-duotone ph-hourglass-high" style="font-size: 32px; color: #f43f5e; margin-bottom: 8px;"></i><small>My Pending</small><strong id="statPending">0</strong></div>
+            <div class="stat"><i class="ph-duotone ph-briefcase" style="font-size: 32px; color: var(--success); margin-bottom: 8px;"></i><small>My Work</small><strong id="statAssigned">0</strong></div>
+        </div>
+
+        <div class="layout">
+            <div class="card">
+                <div class="head">
+                    <div>
+                        <h2>Contractor Dashboard</h2>
+                        <p>Single page for available tenders and assigned work.</p>
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab-btn active" type="button" data-tab="available"><i class="ph-bold ph-list-magnifying-glass" style="margin-right: 6px;"></i>Available Tenders</button>
+                    <button class="tab-btn" type="button" data-tab="work"><i class="ph-bold ph-hammer" style="margin-right: 6px;"></i>My Work</button>
+                    <button class="tab-btn" type="button" data-tab="history"><i class="ph-bold ph-archive-box" style="margin-right: 6px;"></i>History</button>
+                </div>
+
+                <div id="availablePanel" class="panel active">
+                    <div class="toolbar">
+                        <div style="position:relative; width:100%;">
+                            <i class="ph ph-magnifying-glass" style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:18px;"></i>
+                            <input type="text" id="searchInput" placeholder="Search by title, location, or tender ID" style="padding-left: 44px;">
+                        </div>
+                        <button class="btn secondary" type="button" onclick="resetFilters()">Reset Search</button>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tender ID</th>
+                                    <th>Tender Title</th>
+                                    <th>Location</th>
+                                    <th>Pincode</th>
+                                    <th>Deadline</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="availableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="workPanel" class="panel">
+                    <div id="projectSummary" class="stage-list" style="margin-bottom:16px;"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tender ID</th>
+                                    <th>Tender Title</th>
+                                    <th>Deadline</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="workBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="historyPanel" class="panel">
+                    <div class="head" style="margin-bottom:10px;">
+                        <div>
+                            <h2 style="font-size:18px">Project History</h2>
+                            <p>Read-only view of all assigned projects and payment progress.</p>
+                        </div>
+                    </div>
+                    <div class="table-wrap" style="margin-bottom:16px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tender ID</th>
+                                    <th>Tender Title</th>
+                                    <th>Status</th>
+                                    <th>Total Stages</th>
+                                    <th>Verified</th>
+                                    <th>Paid</th>
+                                    <th>Payment</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyProjectBody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="head" style="margin-bottom:10px;">
+                        <div>
+                            <h2 style="font-size:18px">Stage & Payment History</h2>
+                            <p>Select a project from Project History to view its stages (read-only).</p>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tender</th>
+                                    <th>Stage</th>
+                                    <th>Status</th>
+                                    <th>Payment</th>
+                                    <th>Payment Date</th>
+                                    <th>Deadline</th>
+                                    <th>Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyStageBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="dual-forms">
+                    <div class="form-box">
+                        <div class="head">
+                            <div>
+                                <h2>Stage Update</h2>
+                                <p>Only assigned tenders can be updated.</p>
+                            </div>
+                        </div>
+                        <form id="stageForm">
+                            <div class="form-grid">
+                                <div class="full">
+                                    <label class="muted">Tender</label>
+                                    <input type="text" id="selectedTender" readonly placeholder="Select a tender from My Work">
+                                </div>
+                                <div>
+                                    <label class="muted">Select Stage</label>
+                                    <select id="stageSelect">
+                                        <option value="">Select a stage</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="muted">Status</label>
+                                    <select id="stageStatus">
+                                        <option value="">Select status</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Completed">Completed</option>
+                                    </select>
+                                </div>
+                                <div class="full">
+                                    <label class="muted">Remarks</label>
+                                    <textarea id="remarks" placeholder="Enter remarks"></textarea>
+                                </div>
+                                <div class="full">
+                                    <label class="muted">Date</label>
+                                    <input type="text" id="stageDate" readonly>
+                                </div>
+                                <div class="full">
+                                    <label class="muted">Stage Image</label>
+                                    <input type="file" id="stageImage" accept="image/*" style="margin-bottom: 10px;">
+                                    <div id="imagePreviewContainer" style="display:none; position:relative; max-width:200px; margin-top:10px;">
+                                        <img id="imagePreview" src="" alt="Preview" style="max-width:100%; border-radius:4px; border:1px solid var(--border);">
+                                        <button type="button" onclick="removeSelectedImage()" style="position:absolute; top:4px; right:4px; padding:4px 8px; font-size:12px; background:rgba(255,255,255,0.9); border:1px solid #ccc; border-radius:4px; cursor:pointer;" title="Remove Image">X</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:10px;margin-top:14px">
+                                <button class="btn" type="submit">Save Stage</button>
+                                <button class="btn secondary" type="button" onclick="clearStageForm()">Clear</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="form-box">
+                        <div class="head">
+                            <div>
+                                <h2 style="font-size:18px">Request Stage Extension</h2>
+                                <p>Ask admin for more days on the selected stage. Deadlines cannot be changed directly.</p>
+                            </div>
+                        </div>
+                        <form id="extensionForm">
+                            <div class="form-grid">
+                                <div>
+                                    <label class="muted">Requested Days</label>
+                                    <input type="number" id="extensionDays" min="1" placeholder="Enter extra days">
+                                </div>
+                                <div class="full">
+                                    <label class="muted">Reason</label>
+                                    <textarea id="extensionReason" placeholder="Explain why more time is required"></textarea>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:10px;margin-top:14px">
+                                <button class="btn secondary" type="submit">Request Extension</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="head" style="margin-top:18px">
+                    <div>
+                        <h2 style="font-size:18px">Project Stages</h2>
+                        <p>All stages are visible, but only the current active stage can be updated.</p>
+                    </div>
+                </div>
+                <div id="stageList" class="stage-list"></div>
+                <div class="head" style="margin-top:18px">
+                    <div>
+                        <h2 style="font-size:18px">My Extension Requests</h2>
+                        <p>Track pending, approved, and rejected deadline requests.</p>
+                    </div>
+                </div>
+                <div id="extensionRequestList" class="stage-list"></div>
+            </div>
+        </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="imageModal" class="image-modal" onclick="closeImageModal(event)">
+        <div class="image-modal-content" onclick="event.stopPropagation();">
+            <button class="image-modal-close" type="button" onclick="closeImageModal(event)">&times;</button>
+            <img id="imageModalImg" src="" alt="Stage Image">
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="auth-session.js"></script>
+    <script src="performance-system.js"></script>
+    <script src="stage-workflow.js"></script>
+    <script src="contractor-tenders.js"></script>
+</body>
+</html>

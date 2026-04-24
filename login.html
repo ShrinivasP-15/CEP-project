@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Tender Monitoring System</title>
+    <link rel="stylesheet" href="auth.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body class="portal-page">
+    <div class="portal-shell">
+        <header class="portal-topbar">
+            <div class="portal-brand">
+                <div class="portal-brand-mark"><i class="ph-fill ph-buildings"></i></div>
+                <div class="portal-brand-copy">
+                    <span class="portal-brand-stack">TMS</span>
+                    <span class="portal-brand-stack">PORTAL</span>
+                    <span class="portal-brand-subtitle">Demo System</span>
+                </div>
+            </div>
+
+            <div class="portal-topbar-title">
+                <h1>TENDER MONITORING SYSTEM</h1>
+                <p>Transparent | Efficient | Accountable</p>
+            </div>
+
+            <div class="portal-date">
+                <i class="ph ph-calendar-dots"></i>
+                <span data-live-date>Loading...</span>
+            </div>
+        </header>
+
+        <nav class="portal-nav">
+            <div class="portal-nav-links">
+                <a class="nav-link active" href="index.html"><i class="ph ph-house"></i>Home</a>
+                <span class="nav-sep">|</span>
+                <a class="nav-link" href="index.html#about">About</a>
+                <span class="nav-sep">|</span>
+                <a class="nav-link" href="forgot.html">Help</a>
+                <span class="nav-sep">|</span>
+                <a class="nav-link" href="index.html#announcements">Contact Us</a>
+            </div>
+        </nav>
+
+        <main class="portal-main">
+            <section class="login-stage">
+                <div class="login-layout">
+                    <article class="info-card">
+                        <div class="section-heading" style="justify-items: start; margin-bottom: 18px;">
+                            <h2>ABOUT THE SYSTEM</h2>
+                        </div>
+                        <p class="section-copy">
+                            Tender Monitoring System is a centralized platform to manage tenders, monitor project progress and ensure transparency in the entire workflow.
+                        </p>
+
+                        <div class="feature-stack" aria-label="System features">
+                            <div class="feature-row">
+                                <div class="feature-badge"><i class="ph ph-file-text"></i></div>
+                                <div>
+                                    <strong>Tender Management</strong>
+                                    <p>Create, publish and manage tenders in one place.</p>
+                                </div>
+                            </div>
+                            <div class="feature-row">
+                                <div class="feature-badge"><i class="ph ph-chart-bar"></i></div>
+                                <div>
+                                    <strong>Project Monitoring</strong>
+                                    <p>Track project progress and timelines efficiently.</p>
+                                </div>
+                            </div>
+                            <div class="feature-row">
+                                <div class="feature-badge"><i class="ph ph-shield-check"></i></div>
+                                <div>
+                                    <strong>Verification Workflow</strong>
+                                    <p>Verify stages and maintain compliance at every step.</p>
+                                </div>
+                            </div>
+                            <div class="feature-row">
+                                <div class="feature-badge"><i class="ph ph-currency-inr"></i></div>
+                                <div>
+                                    <strong>Payment Tracking</strong>
+                                    <p>Track stage-wise payments with full visibility.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </article>
+
+                    <article class="auth-card login-card">
+                        <div class="auth-title">
+                            <h2>USER LOGIN</h2>
+                            <div class="line"></div>
+                        </div>
+                        <p class="auth-subtitle">Enter your credentials to access the system</p>
+
+                        <form onsubmit="loginUser(event)" class="auth-form">
+                            <div class="field-group">
+                                <label class="field-label" for="username">Username</label>
+                                <div class="input-shell">
+                                    <i class="ph ph-user input-icon"></i>
+                                    <input class="auth-input" type="text" id="username" placeholder="Enter your username or email" required>
+                                </div>
+                            </div>
+
+                            <div class="field-group">
+                                <label class="field-label" for="password">Password</label>
+                                <div class="input-shell has-right-icon">
+                                    <i class="ph ph-lock-simple input-icon"></i>
+                                    <input class="auth-input" type="password" id="password" placeholder="Enter your password" required>
+                                    <button type="button" class="input-right-icon" aria-label="Show password" onclick="togglePassword(this)">
+                                        <i class="ph ph-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="login-row">
+                                <label class="remember-me">
+                                    <input type="checkbox" id="rememberMe">
+                                    <span>Remember me</span>
+                                </label>
+                                <a href="forgot.html" class="auth-link">Forgot Password?</a>
+                            </div>
+
+                            <button type="submit" class="auth-button auth-button-primary uppercase">LOGIN</button>
+
+                            <div class="divider"><span>OR</span></div>
+
+                            <a href="signup.html" class="auth-secondary-button">
+                                <i class="ph ph-user-plus"></i>
+                                Register as New User
+                            </a>
+                        </form>
+                    </article>
+                </div>
+            </section>
+        </main>
+
+        <footer class="portal-footer portal-footer-light">
+            <div class="footer-grid">
+                <div class="footer-item">
+                    <div class="footer-mark"><i class="ph ph-shield-star"></i></div>
+                    <div class="footer-copy">
+                        <div>This is a secure system.</div>
+                        <div>Unauthorized access is prohibited.</div>
+                    </div>
+                </div>
+
+                <div class="footer-center">
+                    <div>&copy; 2025 Tender Monitoring System (Demo)</div>
+                    <div>For Academic Use Only</div>
+                </div>
+
+                <div class="footer-right">
+                    <strong>Designed &amp; Developed by Team Project</strong>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="auth-session.js"></script>
+    <script src="live-date.js"></script>
+    <!-- Authentication: Handles user login and role-based redirection -->
+    <script>
+        function togglePassword(button) {
+            const input = document.getElementById('password');
+            const icon = button.querySelector('i');
+            const isHidden = input.type === 'password';
+            input.type = isHidden ? 'text' : 'password';
+            icon.className = isHidden ? 'ph ph-eye-slash' : 'ph ph-eye';
+            button.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+        }
+
+        function connectionHelpText(errorMessage='') {
+            const base = (errorMessage || '').toLowerCase();
+            if (window.location.protocol === 'file:') {
+                return 'Connection failed because this page is opened with file://. Run the project using localhost (for example Live Server) and try again.';
+            }
+            if (base.includes('failed to fetch') || base.includes('networkerror') || base.includes('load failed')) {
+                return 'Unable to reach Supabase. Please check your internet connection and Supabase project URL/key.';
+            }
+            if (base.includes('supabase') || base.includes('is not defined')) {
+                return 'Supabase client is not initialized. Check that supabase-config.js is loaded and valid.';
+            }
+            return 'Connection failed. Please verify Supabase configuration and network access.';
+        }
+
+        async function loginUser(event) {
+            event.preventDefault();
+
+            const loginValue = document.getElementById("username").value.trim();
+            const password = document.getElementById("password").value;
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+
+            if (!loginValue || !password) {
+                alert('Please enter username and password');
+                return;
+            }
+
+            const originalHTML = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="ph ph-circle-notch"></i> Connecting...';
+
+            try {
+                if (typeof supabaseClient === 'undefined' || !supabaseClient) {
+                    alert(connectionHelpText('supabaseClient is not defined'));
+                    return;
+                }
+
+                const lookupValue = loginValue.toLowerCase();
+
+                let { data: user, error } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .eq('username', loginValue)
+                    .maybeSingle();
+
+                if (!user && !error) {
+                    const emailLookup = await supabaseClient
+                        .from('users')
+                        .select('*')
+                        .eq('email', loginValue)
+                        .maybeSingle();
+                    user = emailLookup.data;
+                    error = emailLookup.error;
+                }
+
+                if (!user && !error && loginValue !== lookupValue) {
+                    const emailLookupLower = await supabaseClient
+                        .from('users')
+                        .select('*')
+                        .eq('email', lookupValue)
+                        .maybeSingle();
+                    user = emailLookupLower.data;
+                    error = emailLookupLower.error;
+                }
+
+                if (error || !user) {
+                    console.error('Login lookup failed:', error);
+                    alert('User not found. Please check your username/email and try again.');
+                    return;
+                }
+
+                if (user.password !== password) {
+                    alert('Incorrect password');
+                    return;
+                }
+
+                const userData = {
+                    id: user.id,
+                    username: user.username,
+                    email: user.email,
+                    role: user.role,
+                    performance_score: user.performance_score ?? 100,
+                    is_blacklisted: user.is_blacklisted === true || user.is_blacklisted === 1,
+                    loginTime: new Date().toLocaleString()
+                };
+
+                AuthSession.setCurrentUser(userData);
+
+                if (user.role === "Admin") {
+                    window.location.href = "project-management.html";
+                }
+                else if (user.role === "Contractor") {
+                    window.location.href = "contractor-tenders.html";
+                }
+                else if (user.role === "User") {
+                    window.location.href = "user-projects.html";
+                }
+                else if (user.role === "Verification Officer") {
+                    window.location.href = "verification-management.html";
+                }
+                else if (user.role === "Auditor") {
+                    window.location.href = "auditor-dashboard.html";
+                }
+                else {
+                    window.location.href = "database-management.html";
+                }
+            } catch (err) {
+                console.error(err);
+                alert(connectionHelpText(err.message));
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalHTML;
+            }
+        }
+    </script>
+</body>
+</html>
